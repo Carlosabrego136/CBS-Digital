@@ -18,6 +18,7 @@ interface FilaExpediente {
 interface Props {
   nombreUsuario: string;
   rol: string;
+  puedeCrear: boolean;
   expedientes: FilaExpediente[];
 }
 
@@ -37,7 +38,7 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   cerrado: 'Cerrado',
 };
 
-export default function Panel({ nombreUsuario, rol, expedientes }: Props) {
+export default function Panel({ nombreUsuario, rol, puedeCrear, expedientes }: Props) {
   return (
     <>
       <Head>
@@ -58,10 +59,22 @@ export default function Panel({ nombreUsuario, rol, expedientes }: Props) {
         </header>
 
         <main className="p-6 lg:p-10">
-          <h1 className="font-display text-2xl text-navy">Expedientes</h1>
-          <p className="text-sm text-ink/60 mt-1">
-            {expedientes.length} expediente{expedientes.length !== 1 ? 's' : ''} en seguimiento.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="font-display text-2xl text-navy">Expedientes</h1>
+              <p className="text-sm text-ink/60 mt-1">
+                {expedientes.length} expediente{expedientes.length !== 1 ? 's' : ''} en seguimiento.
+              </p>
+            </div>
+            {puedeCrear && (
+              <a
+                href="/panel/nuevo-cliente"
+                className="bg-navy text-white text-sm rounded-md px-4 py-2 hover:bg-navy-700 transition-colors"
+              >
+                + Nuevo expediente
+              </a>
+            )}
+          </div>
 
           <div className="mt-6 bg-white rounded-lg border border-line overflow-hidden">
             <table className="w-full text-sm">
@@ -138,16 +151,17 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     expedientes = await query<FilaExpediente>(`
       SELECT
         e.numero_expediente,
-        u.nombre_completo,
+        TRIM(p.nombres || ' ' || COALESCE(p.primer_apellido, '') || ' ' || COALESCE(p.segundo_apellido, '')) AS nombre_completo,
         e.estado,
         e.porcentaje_avance,
         COUNT(a.id) FILTER (WHERE a.resuelta = FALSE) AS alertas_abiertas,
         COUNT(a.id) FILTER (WHERE a.resuelta = FALSE AND a.severidad = 'critica') AS alertas_criticas,
         e.actualizado_en
       FROM expedientes e
-      JOIN usuarios u ON u.id = e.cliente_id
+      JOIN clientes c ON c.id = e.cliente_id
+      JOIN personas p ON p.id = c.persona_id
       LEFT JOIN alertas a ON a.expediente_id = e.id
-      GROUP BY e.id, u.nombre_completo
+      GROUP BY e.id, p.nombres, p.primer_apellido, p.segundo_apellido
       ORDER BY e.actualizado_en DESC
     `);
   } catch (err) {
@@ -160,6 +174,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     props: {
       nombreUsuario: session.user.name || '',
       rol: session.user.rol,
+      puedeCrear: session.user.permisos.includes('crear_expediente'),
       expedientes,
     },
   };
