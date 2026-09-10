@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { validarPassword } from '@/lib/passwordPolicy';
 
 export default function RestablecerPassword() {
   const router = useRouter();
@@ -19,8 +20,9 @@ export default function RestablecerPassword() {
       setError('Las contraseñas no coinciden.');
       return;
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.');
+    const errorPassword = validarPassword(password);
+    if (errorPassword) {
+      setError(errorPassword);
       return;
     }
 
@@ -63,15 +65,18 @@ export default function RestablecerPassword() {
                 <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
               )}
 
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Nueva contraseña"
-                className="w-full border border-line rounded-md px-3 py-2 text-sm focus:border-gold-500"
-              />
+              <div>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Nueva contraseña"
+                  className="w-full border border-line rounded-md px-3 py-2 text-sm focus:border-gold-500"
+                />
+                <p className="text-xs text-ink/50 mt-1">Al menos 6 caracteres, con una letra y un número.</p>
+              </div>
               <input
                 type="password"
                 required

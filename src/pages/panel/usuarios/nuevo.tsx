@@ -25,6 +25,7 @@ export default function NuevoUsuario({ nombreUsuario, permisosUsuario, roles }: 
     correo: '',
     telefono: '',
     rolId: roles.find((r) => r.nombre !== 'cliente')?.id || roles[0]?.id || '',
+    estado: 'activo',
     passwordTemporal: '',
     observaciones: '',
   });
@@ -125,6 +126,18 @@ export default function NuevoUsuario({ nombreUsuario, permisosUsuario, roles }: 
         </div>
 
         <div className="space-y-1">
+          <label className="text-sm text-ink/80">Estado inicial</label>
+          <select
+            value={form.estado}
+            onChange={(e) => actualizar('estado', e.target.value)}
+            className="w-full border border-line rounded-md px-3 py-2 text-sm focus:border-gold-500"
+          >
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo (aún no empieza a trabajar)</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
           <label className="text-sm text-ink/80">Contraseña temporal *</label>
           <input
             required
@@ -133,7 +146,7 @@ export default function NuevoUsuario({ nombreUsuario, permisosUsuario, roles }: 
             onChange={(e) => actualizar('passwordTemporal', e.target.value)}
             className="w-full border border-line rounded-md px-3 py-2 text-sm focus:border-gold-500"
           />
-          <p className="text-xs text-ink/50">El usuario podrá cambiarla después desde su perfil.</p>
+          <p className="text-xs text-ink/50">Al menos 6 caracteres, con una letra y un número. El usuario podrá cambiarla después desde su perfil.</p>
         </div>
 
         <div className="space-y-1">

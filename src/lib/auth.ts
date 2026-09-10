@@ -15,7 +15,12 @@ const MAX_INTENTOS_FALLIDOS = 5;
 const MINUTOS_BLOQUEO_TEMPORAL = 15;
 
 export const authOptions: NextAuthOptions = {
-  session: { strategy: 'jwt' },
+  // Cierre de sesión por inactividad (punto 8, Módulo 1): si no hay
+  // actividad durante 30 minutos, la sesión deja de ser válida. Mientras
+  // la persona sigue usando el sistema, NextAuth renueva el token cada
+  // vez que se revisa la sesión (updateAge), así que un usuario activo
+  // nunca se desconecta a media tarea.
+  session: { strategy: 'jwt', maxAge: 30 * 60, updateAge: 5 * 60 },
   pages: {
     signIn: '/login',
   },

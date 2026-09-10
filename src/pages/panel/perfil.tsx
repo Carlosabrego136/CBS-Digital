@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
 import PanelLayout from '@/components/PanelLayout';
+import { validarPassword } from '@/lib/passwordPolicy';
 
 interface Props {
   nombreUsuario: string;
@@ -36,9 +37,15 @@ export default function Perfil({ nombreUsuario, permisosUsuario, usuario }: Prop
       return;
     }
     if (nueva.length < 6) {
-      setError('La nueva contraseña debe tener al menos 6 caracteres.');
+      setError('La nueva contraseña debe tener al menos 6 caracteres, con una letra y un número.');
       return;
     }
+    const errorPassword = validarPassword(nueva);
+    if (errorPassword) {
+      setError(errorPassword);
+      return;
+    }
+
 
     setEnviando(true);
     const res = await fetch('/api/perfil/cambiar-password', {
@@ -123,6 +130,7 @@ export default function Perfil({ nombreUsuario, permisosUsuario, usuario }: Prop
               onChange={(e) => setNueva(e.target.value)}
               className="w-full border border-line rounded-md px-3 py-2 text-sm focus:border-gold-500"
             />
+            <p className="text-xs text-ink/50">Al menos 6 caracteres, con una letra y un número.</p>
           </div>
           <div className="space-y-1">
             <label className="text-sm text-ink/80">Confirmar contraseña nueva</label>

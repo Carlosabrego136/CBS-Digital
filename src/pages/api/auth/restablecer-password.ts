@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { query } from '@/lib/db';
+import { validarPassword } from '@/lib/passwordPolicy';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
@@ -11,8 +12,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!token || !password) {
     return res.status(400).json({ error: 'Faltan datos' });
   }
-  if (String(password).length < 6) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+  const errorPassword = validarPassword(password);
+  if (errorPassword) {
+    return res.status(400).json({ error: errorPassword });
   }
 
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');

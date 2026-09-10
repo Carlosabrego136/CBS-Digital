@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Head from 'next/head';
 import { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth/next';
@@ -6,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 interface FilaExpediente {
+  id: string;
   numero_expediente: string;
   nombre_completo: string;
   estado: string;
@@ -20,6 +22,8 @@ interface Props {
   rol: string;
   permisos: string[];
   puedeCrear: boolean;
+  puedeArchivar: boolean;
+  puedeEliminar: boolean;
   expedientes: FilaExpediente[];
 }
 
@@ -39,9 +43,35 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   cerrado: 'Cerrado',
 };
 
-export default function Panel({ nombreUsuario, rol, permisos, puedeCrear, expedientes }: Props) {
+export default function Panel({ nombreUsuario, rol, permisos, puedeCrear, puedeArchivar, puedeEliminar, expedientes: expedientesIniciales }: Props) {
+  const [expedientes, setExpedientes] = useState(expedientesIniciales);
   const VIDEO_URL =
     'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260602_132418_e0e79d08-5d1f-42d9-b8ae-8dd69217aacf.mp4';
+
+  async function archivar(id: string, archivarAhora: boolean) {
+    const res = await fetch(`/api/expedientes/${id}/archivar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archivar: archivarAhora }),
+    });
+    if (res.ok) {
+      setExpedientes((exps) =>
+        exps.map((e) => (e.id === id ? { ...e, estado: archivarAhora ? 'archivado' : 'prospecto' } : e))
+      );
+    }
+  }
+
+  async function eliminar(id: string, numero: string) {
+    const confirmado = window.confirm(
+      `Esto elimina el expediente ${numero} de forma DEFINITIVA y no se puede deshacer. ¿Seguro que quieres continuar?`
+    );
+    if (!confirmado) return;
+
+    const res = await fetch(`/api/expedientes/${id}/eliminar`, { method: 'POST' });
+    if (res.ok) {
+      setExpedientes((exps) => exps.filter((e) => e.id !== id));
+    }
+  }
 
   const links = [
     { href: '/panel/usuarios', label: 'Usuarios', permiso: 'administrar_usuarios' },
@@ -140,12 +170,13 @@ export default function Panel({ nombreUsuario, rol, permisos, puedeCrear, expedi
                     <th className="px-4 py-3 font-medium">Avance</th>
                     <th className="px-4 py-3 font-medium">Alertas</th>
                     <th className="px-4 py-3 font-medium">Última actividad</th>
+                    {(puedeArchivar || puedeEliminar) && <th className="px-4 py-3 font-medium text-right">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {expedientes.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-ink/40">
+                      <td colSpan={7} className="px-4 py-10 text-center text-ink/40">
                         Todavía no hay expedientes registrados.
                       </td>
                     </tr>
@@ -176,6 +207,28 @@ export default function Panel({ nombreUsuario, rol, permisos, puedeCrear, expedi
                       <td className="px-4 py-3 text-ink/50">
                         {new Date(exp.actualizado_en).toLocaleDateString('es-MX')}
                       </td>
+                      {(puedeArchivar || puedeEliminar) && (
+                        <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                          {puedeArchivar && exp.estado !== 'archivado' && (
+                            <button onClick={() => archivar(exp.id, true)} className="text-gold-700 hover:underline text-xs">
+                              Archivar
+                            </button>
+                          )}
+                          {puedeArchivar && exp.estado === 'archivado' && (
+                            <button onClick={() => archivar(exp.id, false)} className="text-navy hover:underline text-xs">
+                              Desarchivar
+                            </button>
+                          )}
+                          {puedeEliminar && (
+                            <button
+                              onClick={() => eliminar(exp.id, exp.numero_expediente)}
+                              className="text-red-700 hover:underline text-xs"
+                            >
+                              Eliminar
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -209,6 +262,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     expedientes = await query<FilaExpediente>(
       `
       SELECT
+        e.id,
         e.numero_expediente,
         TRIM(p.nombres || ' ' || COALESCE(p.primer_apellido, '') || ' ' || COALESCE(p.segundo_apellido, '')) AS nombre_completo,
         e.estado,
@@ -241,6 +295,8 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       rol: session.user.rol,
       permisos: session.user.permisos,
       puedeCrear: session.user.permisos.includes('crear_expediente'),
+      puedeArchivar: session.user.permisos.includes('modificar_expediente'),
+      puedeEliminar: session.user.permisos.includes('eliminar_expediente'),
       expedientes,
     },
   };

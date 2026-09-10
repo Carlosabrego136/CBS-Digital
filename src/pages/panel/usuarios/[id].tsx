@@ -16,6 +16,18 @@ interface ActividadFila {
   creado_en: string;
   detalle: any;
 }
+interface HistorialFila {
+  campo: string;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  creado_en: string;
+}
+
+interface ExpedienteOpcion {
+  id: string;
+  numero_expediente: string;
+  nombre_cliente: string;
+}
 
 interface Props {
   nombreUsuario: string;
@@ -32,9 +44,21 @@ interface Props {
   };
   roles: Rol[];
   actividad: ActividadFila[];
+  historial: HistorialFila[];
+  expedientesDisponibles: ExpedienteOpcion[];
+  expedientesAsignadosIds: string[];
 }
 
-export default function EditarUsuario({ nombreUsuario, permisosUsuario, usuario, roles, actividad }: Props) {
+export default function EditarUsuario({
+  nombreUsuario,
+  permisosUsuario,
+  usuario,
+  roles,
+  actividad,
+  historial,
+  expedientesDisponibles,
+  expedientesAsignadosIds,
+}: Props) {
   const router = useRouter();
   const [form, setForm] = useState({
     nombre: usuario.nombre,
@@ -47,9 +71,24 @@ export default function EditarUsuario({ nombreUsuario, permisosUsuario, usuario,
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const [asignados, setAsignados] = useState<string[]>(expedientesAsignadosIds);
+  const [guardandoAsignacion, setGuardandoAsignacion] = useState<string | null>(null);
 
   function actualizar(campo: string, valor: string) {
     setForm((f) => ({ ...f, [campo]: valor }));
+  }
+
+  async function alternarAsignacion(expedienteId: string, asignar: boolean) {
+    setGuardandoAsignacion(expedienteId);
+    const res = await fetch(`/api/usuarios/${usuario.id}/asignar-expediente`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expedienteId, asignar }),
+    });
+    setGuardandoAsignacion(null);
+    if (res.ok) {
+      setAsignados((a) => (asignar ? [...a, expedienteId] : a.filter((id) => id !== expedienteId)));
+    }
   }
 
   async function manejarEnvio(e: FormEvent) {
@@ -179,6 +218,49 @@ export default function EditarUsuario({ nombreUsuario, permisosUsuario, usuario,
               ))}
             </ul>
           )}
+
+          <h2 className="font-display text-lg text-navy mb-4 mt-8">Historial de cambios</h2>
+          {historial.length === 0 ? (
+            <p className="text-sm text-ink/40">Sin cambios registrados todavía.</p>
+          ) : (
+            <ul className="space-y-3">
+              {historial.map((h, i) => (
+                <li key={i} className="text-sm border-b border-line pb-2">
+                  <p className="text-ink">
+                    <span className="font-medium capitalize">{h.campo.replace(/_/g, ' ')}</span>:{' '}
+                    <span className="text-red-600 line-through">{h.valor_anterior ?? '(vacío)'}</span>{' '}
+                    → <span className="text-green-700">{h.valor_nuevo ?? '(vacío)'}</span>
+                  </p>
+                  <p className="text-xs text-ink/40">{new Date(h.creado_en).toLocaleString('es-MX')}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <h2 className="font-display text-lg text-navy mb-4 mt-8">Expedientes asignados</h2>
+          <p className="text-xs text-ink/50 mb-3">
+            Si el rol de esta persona no es administrador, solo podrá ver los expedientes marcados aquí (además
+            de los que ella misma haya creado).
+          </p>
+          {expedientesDisponibles.length === 0 ? (
+            <p className="text-sm text-ink/40">Todavía no hay expedientes en el sistema.</p>
+          ) : (
+            <ul className="space-y-2 max-h-64 overflow-y-auto border border-line rounded-md p-3">
+              {expedientesDisponibles.map((exp) => (
+                <li key={exp.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={asignados.includes(exp.id)}
+                    disabled={guardandoAsignacion === exp.id}
+                    onChange={(e) => alternarAsignacion(exp.id, e.target.checked)}
+                    className="w-4 h-4 accent-navy cursor-pointer"
+                  />
+                  <span className="text-navy font-medium">{exp.numero_expediente}</span>
+                  <span className="text-ink/60">— {exp.nombre_cliente}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </PanelLayout>
@@ -211,6 +293,35 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     [id]
   );
 
+  const historial = await query<HistorialFila>(
+    `SELECT campo, valor_anterior, valor_nuevo, creado_en FROM historial_cambios
+     WHERE entidad = 'usuario' AND entidad_id = $1 ORDER BY creado_en DESC LIMIT 20`,
+    [id]
+  );
+
+  let expedientesDisponibles: ExpedienteOpcion[] = [];
+  let expedientesAsignadosIds: string[] = [];
+  try {
+    expedientesDisponibles = await query<ExpedienteOpcion>(`
+      SELECT e.id, e.numero_expediente,
+             TRIM(p.nombres || ' ' || COALESCE(p.primer_apellido, '')) AS nombre_cliente
+      FROM expedientes e
+      JOIN clientes c ON c.id = e.cliente_id
+      JOIN personas p ON p.id = c.persona_id
+      ORDER BY e.creado_en DESC
+      LIMIT 100
+    `);
+
+    const asignadosRes = await query<{ expediente_id: string }>(
+      `SELECT expediente_id FROM expediente_usuarios_asignados WHERE usuario_id = $1`,
+      [id]
+    );
+    expedientesAsignadosIds = asignadosRes.map((r) => r.expediente_id);
+  } catch {
+    expedientesDisponibles = [];
+    expedientesAsignadosIds = [];
+  }
+
   return {
     props: {
       nombreUsuario: session.user.name || '',
@@ -218,6 +329,9 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       usuario: usuarioRes[0],
       roles,
       actividad,
+      historial,
+      expedientesDisponibles,
+      expedientesAsignadosIds,
     },
   };
 };

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 import { requerirSesion } from '@/lib/apiAuth';
 import { query } from '@/lib/db';
+import { validarPassword } from '@/lib/passwordPolicy';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
@@ -11,7 +12,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { actual, nueva } = req.body || {};
   if (!actual || !nueva) return res.status(400).json({ error: 'Faltan datos' });
-  if (String(nueva).length < 6) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+  const errorPassword = validarPassword(nueva);
+  if (errorPassword) return res.status(400).json({ error: errorPassword });
 
   const rows = await query<{ password_hash: string }>('SELECT password_hash FROM usuarios WHERE id = $1', [
     session.user.id,

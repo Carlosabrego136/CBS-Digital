@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requerirPermiso } from '@/lib/apiAuth';
 import { query } from '@/lib/db';
+import { registrarCambios } from '@/lib/historial';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
@@ -11,8 +12,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const id = req.query.id as string;
   const { nombre, apellidos, telefono, rolId, estado, observaciones } = req.body || {};
 
-  const actual = await query('SELECT estado FROM usuarios WHERE id = $1', [id]);
-  if (actual.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+  const actualRows = await query(
+    'SELECT nombre, apellidos, telefono, rol_id, estado, observaciones_internas FROM usuarios WHERE id = $1',
+    [id]
+  );
+  if (actualRows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+  const antes = actualRows[0];
 
   // Actualización parcial: solo los campos presentes en el body
   const campos: string[] = [];
@@ -40,6 +45,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   valores.push(id);
   await query(`UPDATE usuarios SET ${campos.join(', ')} WHERE id = $${i}`, valores);
+
+  // Historial campo por campo — nunca se sobrescribe sin dejar rastro
+  // (criterio de aceptación del Módulo 1, punto 10).
+  const despues: Record<string, any> = {};
+  if (nombre !== undefined) despues.nombre = nombre;
+  if (apellidos !== undefined) despues.apellidos = apellidos || null;
+  if (telefono !== undefined) despues.telefono = telefono || null;
+  if (rolId !== undefined) despues.rol_id = rolId;
+  if (estado !== undefined) despues.estado = estado;
+  if (observaciones !== undefined) despues.observaciones_internas = observaciones || null;
+
+  await registrarCambios('usuario', id, antes, despues, session.user.id);
 
   await query(
     `INSERT INTO bitacora (usuario_id, accion, detalle) VALUES ($1, 'usuario_actualizado', $2)`,

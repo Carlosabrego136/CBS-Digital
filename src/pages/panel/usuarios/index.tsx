@@ -97,6 +97,7 @@ export default function Usuarios({ nombreUsuario, permisosUsuario, usuarios: usu
               <th className="px-4 py-3 font-medium">Rol</th>
               <th className="px-4 py-3 font-medium">Estado</th>
               <th className="px-4 py-3 font-medium">Último acceso</th>
+              <th className="px-4 py-3 font-medium">Creado</th>
               <th className="px-4 py-3 font-medium text-right">Acciones</th>
             </tr>
           </thead>
@@ -115,6 +116,9 @@ export default function Usuarios({ nombreUsuario, permisosUsuario, usuarios: usu
                   </td>
                   <td className="px-4 py-3 text-ink/50">
                     {u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-MX') : 'Nunca'}
+                  </td>
+                  <td className="px-4 py-3 text-ink/50">
+                    {new Date(u.creado_en).toLocaleDateString('es-MX')}
                   </td>
                   <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
                     <a href={`/panel/usuarios/${u.id}`} className="text-navy hover:underline text-xs">
