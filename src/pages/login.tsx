@@ -23,6 +23,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [mostrarPassword, setMostrarPassword] = useState(false);
 
   async function manejarEnvio(e: FormEvent) {
     e.preventDefault();
@@ -76,7 +77,7 @@ export default function Login() {
           {/* Nav */}
           <nav className="flex items-center justify-between gap-8 px-[clamp(20px,5vw,100px)] pt-[max(env(safe-area-inset-top),clamp(20px,2.4vw,34px))] pb-[clamp(20px,2.4vw,34px)] z-10">
             <div className="bg-black/35 backdrop-blur-sm rounded-md px-3 py-2">
-              <img src="/logo-cbs.png" alt="Cross-Border Solutions" className="h-10 sm:h-12 w-auto" />
+              <img src="/logo-cbs.png" alt="Cross-Border Solutions" className="h-16 sm:h-20 w-auto" />
             </div>
             <span className="font-mono text-white/60 text-[clamp(10px,0.7vw,13px)] tracking-[0.18em] uppercase hidden sm:block">
               Cross-Border Solutions
@@ -121,20 +122,38 @@ export default function Login() {
                   />
                 </div>
 
-                <div>
+                <div className="relative">
                   <label htmlFor="password" className="sr-only">
                     Contraseña
                   </label>
                   <input
                     id="password"
-                    type="password"
+                    type={mostrarPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Contraseña"
                     autoComplete="current-password"
-                    className="w-full bg-transparent border-0 border-b border-white/25 rounded-none px-0.5 pb-[clamp(10px,1.1vw,16px)] font-sora font-light text-[clamp(15px,0.95vw,17px)] text-white placeholder-white/60 focus:outline-none focus:border-white/85 transition-colors"
+                    className="w-full bg-transparent border-0 border-b border-white/25 rounded-none px-0.5 pr-8 pb-[clamp(10px,1.1vw,16px)] font-sora font-light text-[clamp(15px,0.95vw,17px)] text-white placeholder-white/60 focus:outline-none focus:border-white/85 transition-colors"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarPassword((v) => !v)}
+                    aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    className="absolute right-0 bottom-[clamp(8px,1vw,14px)] text-white/50 hover:text-white transition-colors"
+                  >
+                    {mostrarPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
 
                 <button

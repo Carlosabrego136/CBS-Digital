@@ -67,7 +67,7 @@ export default function Panel({ nombreUsuario, rol, puedeCrear, expedientes }: P
           {/* Nav tipo píldora */}
           <nav className="flex items-center justify-between px-4 sm:px-8 py-5 max-w-7xl mx-auto w-full">
             <div className="flex items-center gap-3">
-              <img src="/logo-cbs.png" alt="Cross-Border Solutions" className="h-9 w-auto" />
+              <img src="/logo-cbs.png" alt="Cross-Border Solutions" className="h-14 sm:h-16 w-auto" />
               <div className="hidden sm:block">
                 <p className="font-display text-white text-sm leading-tight">Cross-Border Solutions</p>
                 <p className="text-white/50 text-xs">Panel interno</p>
