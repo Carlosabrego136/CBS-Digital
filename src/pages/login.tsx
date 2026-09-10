@@ -159,6 +159,13 @@ export default function Login() {
                 >
                   {cargando ? 'Verificando…' : 'Entrar'}
                 </button>
+
+                <a
+                  href="/olvide-password"
+                  className="text-center font-mono text-white/50 hover:text-white text-[clamp(10px,0.74vw,13px)] tracking-[0.14em] uppercase transition-colors"
+                >
+                  ¿Olvidaste tu contraseña?
+                </a>
               </form>
             </div>
           </div>

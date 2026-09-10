@@ -178,7 +178,14 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
   let expedientes: FilaExpediente[] = [];
   try {
-    expedientes = await query<FilaExpediente>(`
+    // Un administrador ve todos los expedientes. El resto de roles solo ve
+    // los expedientes de los que es responsable o que le fueron asignados
+    // explícitamente (punto 11, Módulo 1: "un asistente podría tener
+    // asignados 20 expedientes y no necesariamente ver los demás").
+    const verTodos = session.user.rol === 'administrador';
+
+    expedientes = await query<FilaExpediente>(
+      `
       SELECT
         e.numero_expediente,
         TRIM(p.nombres || ' ' || COALESCE(p.primer_apellido, '') || ' ' || COALESCE(p.segundo_apellido, '')) AS nombre_completo,
@@ -191,9 +198,15 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       JOIN clientes c ON c.id = e.cliente_id
       JOIN personas p ON p.id = c.persona_id
       LEFT JOIN alertas a ON a.expediente_id = e.id
+      ${verTodos ? '' : `
+        LEFT JOIN expediente_usuarios_asignados eua ON eua.expediente_id = e.id AND eua.usuario_id = $1
+        WHERE e.responsable_id = $1 OR eua.usuario_id = $1
+      `}
       GROUP BY e.id, p.nombres, p.primer_apellido, p.segundo_apellido
       ORDER BY e.actualizado_en DESC
-    `);
+    `,
+      verTodos ? [] : [session.user.id]
+    );
   } catch (err) {
     // Si la base de datos aún no está conectada/migrada, el panel
     // se muestra vacío en lugar de tronar — útil en el primer arranque.
