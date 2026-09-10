@@ -12,6 +12,7 @@ interface Props {
 
 const NAV_LINKS = [
   { href: '/panel', label: 'Expedientes', permiso: null },
+  { href: '/panel/clientes', label: 'Clientes', permiso: null },
   { href: '/panel/usuarios', label: 'Usuarios', permiso: 'administrar_usuarios' },
   { href: '/panel/roles', label: 'Roles y permisos', permiso: 'administrar_configuracion' },
   { href: '/panel/bitacora', label: 'Bitácora', permiso: 'administrar_usuarios' },
