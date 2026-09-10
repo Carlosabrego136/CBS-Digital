@@ -152,14 +152,22 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getServerSession(context.req, context.res, authOptions);
   if (!session) return { redirect: { destination: '/login', permanent: false } };
 
-  const rows = await query(
-    `SELECT u.nombre, u.apellidos, u.correo, u.telefono, r.nombre AS rol_nombre, u.ultimo_acceso
-     FROM usuarios u JOIN roles r ON r.id = u.rol_id
-     WHERE u.id = $1`,
-    [session.user.id]
-  );
+  try {
+    const rows = await query(
+      `SELECT u.nombre, u.apellidos, u.correo, u.telefono, r.nombre AS rol_nombre, u.ultimo_acceso
+       FROM usuarios u JOIN roles r ON r.id = u.rol_id
+       WHERE u.id = $1`,
+      [session.user.id]
+    );
 
-  if (rows.length === 0) return { redirect: { destination: '/login', permanent: false } };
+    if (rows.length === 0) return { redirect: { destination: '/login', permanent: false } };
 
-  return { props: { nombreUsuario: session.user.name || '', usuario: rows[0] } };
+    return { props: { nombreUsuario: session.user.name || '', permisosUsuario: session.user.permisos, usuario: rows[0] } };
+  } catch (err) {
+    // Si hay un problema momentáneo de conexión con la base de datos,
+    // mandamos de vuelta al panel en vez de mostrar una pantalla de
+    // error en blanco — la persona puede reintentar sin perder la sesión.
+    console.error('Error cargando perfil:', err);
+    return { redirect: { destination: '/panel', permanent: false } };
+  }
 };
