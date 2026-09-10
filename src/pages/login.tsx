@@ -75,9 +75,9 @@ export default function Login() {
 
           {/* Nav */}
           <nav className="flex items-center justify-between gap-8 px-[clamp(20px,5vw,100px)] pt-[max(env(safe-area-inset-top),clamp(20px,2.4vw,34px))] pb-[clamp(20px,2.4vw,34px)] z-10">
-            <span className="font-sora font-extralight text-white text-[clamp(18px,1.6vw,26px)] tracking-[0.16em]">
-              CBS DIGITAL
-            </span>
+            <div className="bg-black/35 backdrop-blur-sm rounded-md px-3 py-2">
+              <img src="/logo-cbs.png" alt="Cross-Border Solutions" className="h-10 sm:h-12 w-auto" />
+            </div>
             <span className="font-mono text-white/60 text-[clamp(10px,0.7vw,13px)] tracking-[0.18em] uppercase hidden sm:block">
               Cross-Border Solutions
             </span>
