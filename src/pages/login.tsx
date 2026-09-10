@@ -79,7 +79,7 @@ export default function Login() {
             <div className="bg-black/35 backdrop-blur-sm rounded-md px-3 py-2">
               <img src="/logo-cbs.png" alt="Cross-Border Solutions" className="h-16 sm:h-20 w-auto" />
             </div>
-            <span className="font-mono text-white/60 text-[clamp(10px,0.7vw,13px)] tracking-[0.18em] uppercase hidden sm:block">
+            <span className="font-mono text-white/80 text-[clamp(13px,1.1vw,18px)] tracking-[0.18em] uppercase hidden sm:block">
               Cross-Border Solutions
             </span>
           </nav>
@@ -87,15 +87,11 @@ export default function Login() {
           {/* Panel de acceso */}
           <div className="flex items-center justify-end sm:justify-end justify-center px-[clamp(20px,5vw,100px)] min-h-0 overflow-y-auto z-10">
             <div className="flex flex-col items-start w-full sm:w-[min(70vw,520px)] lg:w-[min(34vw,620px)] lg:min-w-[380px]">
-              <span className="font-mono text-white text-[clamp(10px,0.72vw,13px)] tracking-[0.2em] uppercase bg-white/[0.09] px-[clamp(14px,1.1vw,20px)] py-[clamp(9px,0.8vw,14px)] leading-none">
-                [ Acceso seguro ]
-              </span>
-
-              <h1 className="font-sora font-extralight text-white text-[clamp(44px,6.2vw,100px)] leading-[0.95] tracking-[0.02em] mt-[clamp(24px,3vw,44px)]">
+              <h1 className="font-sora font-extralight text-white text-[clamp(44px,6.2vw,100px)] leading-[0.95] tracking-[0.02em]">
                 CBS Digital
               </h1>
 
-              <p className="font-mono font-light text-white/60 text-[clamp(10px,0.9vw,15px)] tracking-[0.14em] uppercase mt-[clamp(12px,1.4vw,20px)] leading-relaxed">
+              <p className="font-mono font-light text-white/70 text-[clamp(13px,1.15vw,19px)] tracking-[0.14em] uppercase mt-[clamp(14px,1.6vw,24px)] leading-relaxed">
                 Expediente maestro B1/B2 · trámites migratorios
               </p>
 
@@ -140,15 +136,15 @@ export default function Login() {
                     type="button"
                     onClick={() => setMostrarPassword((v) => !v)}
                     aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                    className="absolute right-0 bottom-[clamp(8px,1vw,14px)] text-white/50 hover:text-white transition-colors"
+                    className="absolute right-1 bottom-[clamp(4px,0.6vw,8px)] flex items-center justify-center w-7 h-7 rounded-full bg-navy-900 text-white hover:bg-navy-700 transition-colors"
                   >
                     {mostrarPassword ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
                         <line x1="1" y1="1" x2="23" y2="23" />
                       </svg>
                     ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                         <circle cx="12" cy="12" r="3" />
                       </svg>
