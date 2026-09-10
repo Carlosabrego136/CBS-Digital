@@ -41,6 +41,8 @@ module.exports = {
       fontFamily: {
         display: ['var(--font-source-serif)', 'Georgia', 'serif'],
         body: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        sora: ['var(--font-sora)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-jetbrains)', 'ui-monospace', 'monospace'],
       },
     },
   },
