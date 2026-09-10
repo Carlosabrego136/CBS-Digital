@@ -18,6 +18,7 @@ interface FilaExpediente {
 interface Props {
   nombreUsuario: string;
   rol: string;
+  permisos: string[];
   puedeCrear: boolean;
   expedientes: FilaExpediente[];
 }
@@ -38,9 +39,16 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   cerrado: 'Cerrado',
 };
 
-export default function Panel({ nombreUsuario, rol, puedeCrear, expedientes }: Props) {
+export default function Panel({ nombreUsuario, rol, permisos, puedeCrear, expedientes }: Props) {
   const VIDEO_URL =
     'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260602_132418_e0e79d08-5d1f-42d9-b8ae-8dd69217aacf.mp4';
+
+  const links = [
+    { href: '/panel/usuarios', label: 'Usuarios', permiso: 'administrar_usuarios' },
+    { href: '/panel/roles', label: 'Roles y permisos', permiso: 'administrar_configuracion' },
+    { href: '/panel/bitacora', label: 'Bitácora', permiso: 'administrar_usuarios' },
+    { href: '/panel/perfil', label: 'Mi perfil', permiso: null },
+  ].filter((l) => !l.permiso || permisos.includes(l.permiso));
 
   return (
     <>
@@ -83,6 +91,20 @@ export default function Panel({ nombreUsuario, rol, puedeCrear, expedientes }: P
               </button>
             </div>
           </nav>
+
+          {links.length > 0 && (
+            <div className="flex justify-center gap-1 pb-2">
+              {links.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  className="text-xs uppercase tracking-wide text-white/60 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 transition-colors"
+                >
+                  {l.label}
+                </a>
+              ))}
+            </div>
+          )}
 
           {/* Encabezado estilo hero */}
           <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-16">
@@ -217,6 +239,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     props: {
       nombreUsuario: session.user.name || '',
       rol: session.user.rol,
+      permisos: session.user.permisos,
       puedeCrear: session.user.permisos.includes('crear_expediente'),
       expedientes,
     },
