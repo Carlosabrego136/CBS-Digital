@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import { query } from '@/lib/db';
+import { enviarCorreoRecuperacion } from '@/lib/email';
 
 const VIGENCIA_MINUTOS = 30;
 
@@ -35,10 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const enlace = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/restablecer-password?token=${tokenPlano}`;
 
-  // TODO: conectar un proveedor de correo real (ej. Resend) para enviar
-  // este enlace por email. Mientras tanto, se imprime en el log del
-  // servidor para que puedas probarlo tú mismo desde Vercel → Logs.
-  console.log(`[Recuperación de contraseña] Enlace para ${correo}: ${enlace}`);
+  await enviarCorreoRecuperacion(correo, enlace);
 
   return respuestaGenerica();
 }

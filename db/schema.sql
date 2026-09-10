@@ -45,6 +45,7 @@ CREATE TABLE usuarios (
   telefono TEXT,
   password_hash TEXT NOT NULL,
   rol_id UUID NOT NULL REFERENCES roles(id),
+  persona_id UUID, -- solo se usa cuando rol = 'cliente': conecta el login con su ficha de persona/expediente
   estado estado_usuario NOT NULL DEFAULT 'activo',
   intentos_fallidos SMALLINT NOT NULL DEFAULT 0,
   bloqueado_hasta TIMESTAMPTZ,
@@ -280,6 +281,8 @@ ALTER TABLE expediente_usuarios_asignados
   ADD CONSTRAINT fk_expediente FOREIGN KEY (expediente_id) REFERENCES expedientes(id) ON DELETE CASCADE;
 ALTER TABLE bitacora
   ADD CONSTRAINT fk_bitacora_expediente FOREIGN KEY (expediente_id) REFERENCES expedientes(id) ON DELETE CASCADE;
+ALTER TABLE usuarios
+  ADD CONSTRAINT fk_usuarios_persona FOREIGN KEY (persona_id) REFERENCES personas(id) ON DELETE SET NULL;
 
 -- ------------------------------------------------------------
 -- Módulos de captura (1 a 12 del cuestionario del solicitante)
@@ -469,3 +472,4 @@ CREATE INDEX idx_bitacora_expediente ON bitacora(expediente_id);
 CREATE INDEX idx_clientes_persona ON clientes(persona_id);
 CREATE INDEX idx_persona_relaciones_persona ON persona_relaciones(persona_id);
 CREATE INDEX idx_historial_entidad ON historial_cambios(entidad, entidad_id);
+CREATE INDEX idx_usuarios_persona ON usuarios(persona_id) WHERE persona_id IS NOT NULL;

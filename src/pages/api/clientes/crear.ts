@@ -1,7 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getDbPool } from '@/lib/db';
+import { enviarCorreoInvitacion } from '@/lib/email';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -16,10 +19,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(403).json({ error: 'No tienes permiso para crear expedientes' });
   }
 
-  const { nombres, primerApellido, segundoApellido, correo, telefono, tipoTramite } = req.body || {};
+  const { nombres, primerApellido, segundoApellido, correo, telefono, tipoTramite, darAccesoPortal } = req.body || {};
 
   if (!nombres || typeof nombres !== 'string') {
     return res.status(400).json({ error: 'El nombre es obligatorio' });
+  }
+  if (darAccesoPortal && !correo) {
+    return res.status(400).json({ error: 'Necesitas un correo para dar acceso al portal' });
   }
 
   const client = await getDbPool().connect();
@@ -77,11 +83,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [session.user.id, expedienteRes.rows[0].id, JSON.stringify({ nombres, tipoTramite })]
     );
 
+    let invitacionEnviada = false;
+    let enlaceInvitacion: string | null = null;
+    let correoParaInvitar: string | null = null;
+
+    if (darAccesoPortal && correo) {
+      const usuarioExistente = await client.query('SELECT id FROM usuarios WHERE correo = $1', [correo]);
+
+      if (usuarioExistente.rows.length === 0) {
+        const rolCliente = await client.query(`SELECT id FROM roles WHERE nombre = 'cliente'`);
+        // Contraseña aleatoria de relleno — nadie la usa, el cliente la
+        // reemplaza por la suya al abrir el enlace de invitación.
+        const passwordRelleno = crypto.randomBytes(16).toString('hex');
+        const hashRelleno = await bcrypt.hash(passwordRelleno, 10);
+
+        const nuevoUsuario = await client.query(
+          `INSERT INTO usuarios (nombre, correo, password_hash, rol_id, persona_id, creado_por)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+          [nombres, correo, hashRelleno, rolCliente.rows[0].id, personaId, session.user.id]
+        );
+
+        const tokenPlano = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(tokenPlano).digest('hex');
+
+        await client.query(
+          `INSERT INTO tokens_recuperacion (usuario_id, token_hash, expira_en) VALUES ($1, $2, now() + interval '24 hours')`,
+          [nuevoUsuario.rows[0].id, tokenHash]
+        );
+
+        enlaceInvitacion = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/restablecer-password?token=${tokenPlano}`;
+        correoParaInvitar = correo;
+        invitacionEnviada = true;
+      }
+    }
+
     await client.query('COMMIT');
+
+    // El correo se manda después del COMMIT: si el envío falla, el
+    // cliente y expediente ya quedaron creados correctamente de todas formas.
+    if (invitacionEnviada && enlaceInvitacion && correoParaInvitar) {
+      await enviarCorreoInvitacion(correoParaInvitar, nombres, enlaceInvitacion);
+    }
 
     return res.status(201).json({
       numeroExpediente: expedienteRes.rows[0].numero_expediente,
       posibleDuplicado,
+      invitacionEnviada,
     });
   } catch (err: any) {
     await client.query('ROLLBACK');

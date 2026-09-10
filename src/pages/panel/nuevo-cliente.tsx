@@ -16,12 +16,13 @@ export default function NuevoCliente() {
     correo: '',
     telefono: '',
     tipoTramite: 'B1/B2',
+    darAccesoPortal: false,
   });
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  function actualizar(campo: string, valor: string) {
+  function actualizar(campo: string, valor: string | boolean) {
     setForm((f) => ({ ...f, [campo]: valor }));
   }
 
@@ -49,9 +50,11 @@ export default function NuevoCliente() {
       setAviso(
         `Aviso: ya existe un cliente con ese correo (${data.posibleDuplicado.nombres} ${data.posibleDuplicado.primer_apellido || ''}). Se creó de todas formas — revísalo para evitar duplicados.`
       );
+    } else if (data.invitacionEnviada) {
+      setAviso(`Se envió un correo de invitación a ${form.correo} para que cree su contraseña.`);
     }
 
-    setTimeout(() => router.push('/panel'), data.posibleDuplicado ? 2500 : 500);
+    setTimeout(() => router.push('/panel'), data.posibleDuplicado || data.invitacionEnviada ? 2500 : 500);
   }
 
   return (
@@ -147,6 +150,19 @@ export default function NuevoCliente() {
                 ))}
               </select>
             </div>
+
+            <label className="flex items-start gap-2 text-sm text-ink/80 bg-navy-50 rounded-md p-3">
+              <input
+                type="checkbox"
+                checked={form.darAccesoPortal}
+                onChange={(e) => actualizar('darAccesoPortal', e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-navy"
+              />
+              <span>
+                Dar acceso al portal para este cliente — le mandamos un correo para que cree su propia contraseña
+                y pueda entrar a ver su expediente. Requiere que hayas puesto un correo arriba.
+              </span>
+            </label>
 
             <button
               type="submit"
