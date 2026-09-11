@@ -23,6 +23,7 @@ interface Props {
     nacionalidad_actual: string | null;
     sexo: string | null;
     estado_civil: string | null;
+    a_number: string | null;
   };
   contacto: {
     telefono_principal: string | null;
@@ -47,6 +48,7 @@ export default function EditarCliente({ nombreUsuario, permisosUsuario, clienteI
     nacionalidad: persona.nacionalidad_actual || '',
     sexo: persona.sexo || '',
     estadoCivil: persona.estado_civil || '',
+    aNumber: persona.a_number || '',
     correo: contacto?.correo || '',
     correoAlterno: contacto?.correo_alterno || '',
     telefono: contacto?.telefono_principal || '',
@@ -187,6 +189,15 @@ export default function EditarCliente({ nombreUsuario, permisosUsuario, clienteI
               <input
                 value={form.nacionalidad}
                 onChange={(e) => actualizar('nacionalidad', e.target.value)}
+                className="w-full border border-line rounded-md px-3 py-2 text-sm focus:border-gold-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-ink/80">A-Number (USCIS)</label>
+              <input
+                value={form.aNumber}
+                onChange={(e) => actualizar('aNumber', e.target.value)}
+                placeholder="Ej. A123456789"
                 className="w-full border border-line rounded-md px-3 py-2 text-sm focus:border-gold-500"
               />
             </div>

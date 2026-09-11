@@ -25,8 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
        nombre_completo_pasaporte = $4, fecha_nacimiento = $5,
        ciudad_nacimiento = $6, estado_nacimiento = $7, pais_nacimiento = $8,
        nacionalidad_actual = $9, sexo = $10, estado_civil = $11,
-       actualizado_en = now()
-     WHERE id = $12`,
+       a_number = $12, actualizado_en = now()
+     WHERE id = $13`,
     [
       body.nombres,
       body.primerApellido || null,
@@ -39,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       body.nacionalidad || null,
       body.sexo || null,
       body.estadoCivil || null,
+      body.aNumber || null,
       personaId,
     ]
   );
@@ -59,6 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       nacionalidad_actual: body.nacionalidad || null,
       sexo: body.sexo || null,
       estado_civil: body.estadoCivil || null,
+      a_number: body.aNumber || null,
     },
     session.user.id
   );
