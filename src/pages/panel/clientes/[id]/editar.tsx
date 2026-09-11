@@ -41,7 +41,9 @@ export default function EditarCliente({ nombreUsuario, permisosUsuario, clienteI
     primerApellido: persona.primer_apellido || '',
     segundoApellido: persona.segundo_apellido || '',
     nombreCompletoPasaporte: persona.nombre_completo_pasaporte || '',
-    fechaNacimiento: persona.fecha_nacimiento ? persona.fecha_nacimiento.substring(0, 10) : '',
+    fechaNacimiento: persona.fecha_nacimiento
+      ? new Date(persona.fecha_nacimiento).toISOString().substring(0, 10)
+      : '',
     ciudadNacimiento: persona.ciudad_nacimiento || '',
     estadoNacimiento: persona.estado_nacimiento || '',
     paisNacimiento: persona.pais_nacimiento || '',
