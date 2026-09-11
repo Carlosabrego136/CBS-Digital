@@ -625,10 +625,11 @@ export default function FichaCliente({
                 {expedientes.map((e) => (
                   <li key={e.id} className="py-3 flex items-center justify-between text-sm">
                     <div>
-                      <a href="/panel" className="font-medium text-navy hover:underline">
-                        {e.numero_expediente}
-                      </a>
+                      <span className="font-medium text-navy">{e.numero_expediente}</span>
                       <span className="text-ink/60"> — {e.tipo_tramite}</span>
+                      <a href={`/panel/expedientes/${e.id}/historial-migratorio`} className="ml-3 text-xs text-gold-700 hover:underline">
+                        Historial migratorio →
+                      </a>
                     </div>
                     <span className="text-ink/50">{new Date(e.creado_en).toLocaleDateString('es-MX')}</span>
                   </li>
