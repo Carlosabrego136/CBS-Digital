@@ -417,7 +417,8 @@ function generarResumenMigratorio(
   const partes = [`Historial migratorio: ${frases.join(' ')}`];
 
   if (alertasActivas.length > 0) {
-    partes.push(`Alertas: ${alertasActivas.map((a) => a.descripcion).join('; ')}.`);
+    const listaAlertas = alertasActivas.map((a) => a.descripcion.trim().replace(/\.$/, '')).join('; ');
+    partes.push(`Alertas: ${listaAlertas}.`);
     const hayCritica = alertasActivas.some((a) => a.severidad === 'critica');
     partes.push(
       `Acción sugerida por sistema: ${
