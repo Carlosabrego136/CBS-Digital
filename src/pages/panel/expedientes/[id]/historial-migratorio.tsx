@@ -290,11 +290,31 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
   const [guardandoAnalisis, setGuardandoAnalisis] = useState(false);
   const [mensajeAnalisis, setMensajeAnalisis] = useState<string | null>(null);
 
+  // Registros creados ANTES de esta actualización no tienen "id" propio
+  // (esa función se agregó ahora para poder adjuntar documentos por
+  // registro). Aquí se les asigna uno automáticamente al cargar, sin
+  // que el usuario tenga que volver a capturar nada.
+  function conIdsGarantizados(respuestas: RespuestasModulo3): RespuestasModulo3 {
+    const secciones: (keyof RespuestasModulo3)[] = [
+      'visasAnteriores', 'historialEntradas', 'permanenciasExcedidas', 'negativasVisa',
+      'cancelacionesVisa', 'incidentesCbp', 'deportacionesRemociones', 'fraudeRepresentacion',
+      'antecedentesPenales', 'peticionesAnteriores', 'waiversPerdones', 'foiaExpedientes',
+    ];
+    const copia: any = { ...respuestas };
+    for (const seccion of secciones) {
+      const arreglo = copia[seccion];
+      if (Array.isArray(arreglo)) {
+        copia[seccion] = arreglo.map((item: any) => (item.id ? item : { ...item, id: generarId() }));
+      }
+    }
+    return copia;
+  }
+
   function cargarModulo3() {
     return fetch(`/api/expedientes/${expediente.id}/modulo-3`)
       .then((r) => r.json())
       .then((data) => {
-        setRespuestas(data.respuestas || {});
+        setRespuestas(conIdsGarantizados(data.respuestas || {}));
         setSemaforo(data.semaforo || 'verde');
         setAlertas(data.alertas || []);
         setDocumentosPorRegistro(data.documentosPorRegistro || {});
