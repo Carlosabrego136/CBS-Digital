@@ -338,6 +338,25 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
       });
   }
 
+  // Se usa al adjuntar/quitar un documento. A diferencia de
+  // cargarModulo3(), NO toca "respuestas" — si el registro (ej. una
+  // negativa de visa recién agregada) aún no se había guardado con
+  // "Guardar avance", recargar el módulo completo lo hacía desaparecer
+  // del formulario porque el servidor todavía no lo conocía. Esto solo
+  // refresca la lista de documentos por registro.
+  function cargarDocumentos() {
+    return fetch(`/api/expedientes/${expediente.id}/documentos-migratorios`)
+      .then((r) => r.json())
+      .then((data) => {
+        const agrupado: Record<string, DocumentoRegistro[]> = {};
+        for (const doc of data.documentos || []) {
+          if (!agrupado[doc.entidad_id]) agrupado[doc.entidad_id] = [];
+          agrupado[doc.entidad_id].push(doc);
+        }
+        setDocumentosPorRegistro(agrupado);
+      });
+  }
+
   useEffect(() => {
     cargarModulo3()
       .catch(() => setError('No se pudo cargar el historial migratorio.'))
@@ -410,7 +429,7 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
     );
   }
 
-  const seccionRepetibleProps = { expedienteId: expediente.id, documentosPorRegistro, onDocumentosChange: cargarModulo3, disabled: !puedeEditar };
+  const seccionRepetibleProps = { expedienteId: expediente.id, documentosPorRegistro, onDocumentosChange: cargarDocumentos, disabled: !puedeEditar };
 
   return (
     <PanelLayout
