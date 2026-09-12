@@ -290,6 +290,8 @@ export default function EvaluacionRiesgosPage({
                     `Entrada(s) sin fecha de salida registrada (${matriz.entradasSalidas.entradasSinSalida.length})`,
                   matriz.entradasSalidas.inconsistenciasFechas.length > 0 &&
                     `Inconsistencia(s) entre fecha de entrada y salida (${matriz.entradasSalidas.inconsistenciasFechas.length})`,
+                  matriz.entradasSalidas.patronViajes.patronDetectado &&
+                    `Patrón de viajes frecuentes (hasta ${matriz.entradasSalidas.patronViajes.maxEntradasEn12Meses} entradas y ${matriz.entradasSalidas.patronViajes.maxDiasAcumuladosEn12Meses} días acumulados en 12 meses)`,
                 ]}
               />
               <MatrizBloque
@@ -308,7 +310,9 @@ export default function EvaluacionRiesgosPage({
                 titulo="D. Posibles causales de inadmisibilidad"
                 items={[
                   matriz.causalesInadmisibilidad.causal212a6c1 && 'INA 212(a)(6)(C)(i) — posible fraude o tergiversación material',
-                  matriz.causalesInadmisibilidad.causal212a9 && 'INA 212(a)(9) — posible remoción anterior, presencia ilegal o reingreso irregular',
+                  matriz.causalesInadmisibilidad.causal212a9a && 'INA 212(a)(9)(A) — posible remoción/expulsión formal anterior',
+                  matriz.causalesInadmisibilidad.causal212a9b && 'INA 212(a)(9)(B) — posible presencia ilegal',
+                  matriz.causalesInadmisibilidad.causal212a9c && 'INA 212(a)(9)(C) — posible reingreso tras una remoción anterior',
                   matriz.causalesInadmisibilidad.causal212a2 && 'INA 212(a)(2) — posibles antecedentes relacionados con conductas o delitos',
                 ]}
                 nota="Posible causal que requiere análisis profesional — el sistema nunca determina inadmisibilidad por sí solo."

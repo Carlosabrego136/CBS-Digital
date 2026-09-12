@@ -13,6 +13,7 @@
 // expediente — esto es lo que alimenta la sección "Expedientes
 // recientes" del Dashboard, sin necesitar una tabla nueva.
 
+import { useEffect, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -87,6 +88,8 @@ export default function ExpedienteResumen({ nombreUsuario, permisosUsuario, expe
         </div>
       </div>
 
+      <TramitesResumen expedienteId={expediente.id} puedeEditar={permisosUsuario.includes('modificar_expediente')} />
+
       <div className="grid grid-cols-2 gap-4">
         <a
           href={`/panel/expedientes/${expediente.id}/historial-migratorio`}
@@ -104,6 +107,75 @@ export default function ExpedienteResumen({ nombreUsuario, permisosUsuario, expe
         </a>
       </div>
     </PanelLayout>
+  );
+}
+
+const SEMAFORO_DOC_COLOR: Record<string, string> = {
+  verde: 'bg-green-500',
+  amarillo: 'bg-yellow-500',
+  rojo: 'bg-red-500',
+};
+
+interface TramiteResumenItem {
+  id: string;
+  tipoTramiteNombre: string;
+  esPrincipal: boolean;
+  estado: string;
+  etapaActual: string | null;
+  responsableNombre: string | null;
+  avanceAdministrativo: number;
+  semaforoDocumental: 'verde' | 'amarillo' | 'rojo';
+  proximaFecha: { etiqueta: string; valor: string } | null;
+}
+
+// Punto 18 — vista resumen de trámites desde la pantalla principal
+// del expediente. Se carga aparte (no en el SSR de la página) para
+// no volver más pesada la carga inicial de la ficha.
+function TramitesResumen({ expedienteId, puedeEditar }: { expedienteId: string; puedeEditar: boolean }) {
+  const [tramites, setTramites] = useState<TramiteResumenItem[] | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/expedientes/${expedienteId}/tramites`)
+      .then((r) => r.json())
+      .then((data) => setTramites(data.tramites || []))
+      .catch(() => setTramites([]));
+  }, [expedienteId]);
+
+  return (
+    <div className="bg-white border border-line rounded-lg p-6 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-display text-base text-navy">Trámites (Módulo 5)</h3>
+        {puedeEditar && (
+          <a href={`/panel/expedientes/${expedienteId}/tramites/nuevo`} className="text-xs border border-line rounded-md px-3 py-1.5 hover:bg-navy-50 transition-colors">
+            + Nuevo trámite
+          </a>
+        )}
+      </div>
+      {tramites === null && <p className="text-sm text-ink/40">Cargando…</p>}
+      {tramites && tramites.length === 0 && <p className="text-sm text-ink/40">Este expediente todavía no tiene ningún trámite dado de alta.</p>}
+      {tramites && tramites.length > 0 && (
+        <ul className="divide-y divide-line">
+          {tramites.map((t) => (
+            <li key={t.id} className="py-3 first:pt-0 last:pb-0">
+              <a href={`/panel/expedientes/${expedienteId}/tramites/${t.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm hover:text-navy">
+                <span className={`inline-block w-2.5 h-2.5 rounded-full ${SEMAFORO_DOC_COLOR[t.semaforoDocumental]}`} title="Semáforo documental" />
+                <span className="font-medium text-ink">{t.tipoTramiteNombre}</span>
+                {t.esPrincipal && <span className="text-[10px] uppercase tracking-wide text-navy border border-navy-100 rounded px-1.5 py-0.5">Principal</span>}
+                <span className="text-ink/60">{t.estado.replace(/_/g, ' ')}</span>
+                {t.etapaActual && <span className="text-ink/40">· {t.etapaActual}</span>}
+                {t.responsableNombre && <span className="text-ink/40">· {t.responsableNombre}</span>}
+                <span className="text-ink/40">· Avance administrativo: {t.avanceAdministrativo}%</span>
+                {t.proximaFecha && (
+                  <span className="text-ink/40">
+                    · Próxima fecha: {t.proximaFecha.etiqueta} ({new Date(t.proximaFecha.valor).toLocaleDateString('es-MX')})
+                  </span>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

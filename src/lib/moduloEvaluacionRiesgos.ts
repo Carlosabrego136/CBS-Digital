@@ -102,7 +102,52 @@ function evaluarEntradasSalidas(r: RespuestasModulo3) {
     }
   }
 
-  return { estanciasProlongadas, entradasSinSalida, inconsistenciasFechas, permanenciasCercaLimite };
+  return { estanciasProlongadas, entradasSinSalida, inconsistenciasFechas, permanenciasCercaLimite, patronViajes: evaluarPatronViajes(entradas) };
+}
+
+// ------------------------------------------------------------
+// "Viajes demasiado frecuentes" (ajuste pedido por el cliente sobre
+// el Módulo 4 ya aprobado): análisis cuantitativo básico — número de
+// entradas dentro de una ventana móvil de 12 meses, y duración
+// acumulada de estancias en esa misma ventana. Nunca concluye que
+// hubo uso indebido de la visa; solo describe el patrón.
+// ------------------------------------------------------------
+const DIAS_VENTANA_PATRON = 365;
+const UMBRAL_ENTRADAS_EN_VENTANA = 3;
+const UMBRAL_DIAS_ACUMULADOS_EN_VENTANA = 180;
+
+function evaluarPatronViajes(entradas: RespuestasModulo3['historialEntradas']) {
+  const conFecha = (entradas ?? [])
+    .filter((e) => !!e.fechaEntrada)
+    .map((e) => ({
+      entrada: new Date(e.fechaEntrada as string).getTime(),
+      salida: e.fechaSalida ? new Date(e.fechaSalida).getTime() : null,
+    }))
+    .filter((e) => !Number.isNaN(e.entrada));
+
+  let maxEntradasEnVentana = 0;
+  let maxDiasAcumuladosEnVentana = 0;
+
+  for (const ancla of conFecha) {
+    const finVentana = ancla.entrada + DIAS_VENTANA_PATRON * DIA_MS;
+    let contador = 0;
+    let diasAcumulados = 0;
+    for (const e of conFecha) {
+      if (e.entrada >= ancla.entrada && e.entrada <= finVentana) {
+        contador += 1;
+        if (e.salida && e.salida > e.entrada) diasAcumulados += Math.round((e.salida - e.entrada) / DIA_MS);
+      }
+    }
+    maxEntradasEnVentana = Math.max(maxEntradasEnVentana, contador);
+    maxDiasAcumuladosEnVentana = Math.max(maxDiasAcumuladosEnVentana, diasAcumulados);
+  }
+
+  return {
+    totalEntradas: conFecha.length,
+    maxEntradasEn12Meses: maxEntradasEnVentana,
+    maxDiasAcumuladosEn12Meses: maxDiasAcumuladosEnVentana,
+    patronDetectado: maxEntradasEnVentana >= UMBRAL_ENTRADAS_EN_VENTANA || maxDiasAcumuladosEnVentana >= UMBRAL_DIAS_ACUMULADOS_EN_VENTANA,
+  };
 }
 
 // ============================================================
@@ -127,18 +172,49 @@ function evaluarHistorialAdverso(r: RespuestasModulo3) {
 // ============================================================
 // D. Posibles causales de inadmisibilidad (INA)
 // ============================================================
+const TIPOS_REMOCION = ['expedited_removal', 'removal_order', 'stipulated_removal', 'deportacion'];
+
+function evaluarCausal212a9(r: RespuestasModulo3) {
+  const deportaciones = r.deportacionesRemociones ?? [];
+  const registrosDeRemocion = deportaciones.filter((d) => TIPOS_REMOCION.includes(d.tipo || ''));
+
+  // 9(A) — removal/expulsión formal anterior (expedited removal, removal
+  // order, stipulated removal u otra deportación registrada).
+  const causal212a9a = registrosDeRemocion.length > 0;
+
+  // 9(B) — presencia ilegal (overstay). Se apoya en lo ya capturado en
+  // el Módulo 3: la pregunta directa del perfil, o registros de
+  // permanencia excedida.
+  const causal212a9b = !!r.perfil?.permanenciaExcedidaAlgunaVez || (r.permanenciasExcedidas ?? []).length > 0;
+
+  // 9(C) — reingreso (o intento) después de una remoción/deportación.
+  // Criterio verificable con lo capturado: existe una remoción con
+  // fecha Y una entrada posterior a esa fecha en el historial.
+  const fechasRemocion = registrosDeRemocion
+    .map((d) => (d.fecha ? new Date(d.fecha).getTime() : null))
+    .filter((f): f is number => f !== null && !Number.isNaN(f));
+  const causal212a9c =
+    fechasRemocion.length > 0 &&
+    (r.historialEntradas ?? []).some((e) => {
+      if (!e.fechaEntrada) return false;
+      const t = new Date(e.fechaEntrada).getTime();
+      return !Number.isNaN(t) && fechasRemocion.some((f) => t > f);
+    });
+
+  return { causal212a9a, causal212a9b, causal212a9c };
+}
+
 function evaluarCausalesInadmisibilidad(r: RespuestasModulo3) {
   const negativaPor212a6c1 = (r.negativasVisa ?? []).some((n) => n.seccionLegal === '212a6c1');
   const fraudeMenciona212a6c1 = (r.fraudeRepresentacion ?? []).some((f) => !!f.seMencionoSeccion);
   const causal212a2 = (r.antecedentesPenales ?? []).some((a) => !!a.fueArrestado || !!a.fueAcusado || !!a.fueCondenado);
-  const causal212a9 =
-    (r.deportacionesRemociones ?? []).length > 0 ||
-    !!r.perfil?.permanenciaExcedidaAlgunaVez ||
-    (r.permanenciasExcedidas ?? []).length > 0;
+  const { causal212a9a, causal212a9b, causal212a9c } = evaluarCausal212a9(r);
 
   return {
     causal212a6c1: negativaPor212a6c1 || fraudeMenciona212a6c1 || !!r.perfil?.afirmoCiudadaniaFalsa,
-    causal212a9,
+    causal212a9a,
+    causal212a9b,
+    causal212a9c,
     causal212a2,
   };
 }
@@ -174,6 +250,13 @@ function detectarAlertasModulo4(r: RespuestasModulo3, matriz: MatrizRiesgos): Al
   if (matriz.entradasSalidas.permanenciasCercaLimite.length > 0) alertas.push({ codigo: 'm4_permanencia_cercana_limite' });
   if (matriz.entradasSalidas.entradasSinSalida.length > 0) alertas.push({ codigo: 'm4_entrada_sin_salida' });
   if (matriz.entradasSalidas.inconsistenciasFechas.length > 0) alertas.push({ codigo: 'm4_inconsistencia_fechas_entrada' });
+  if (matriz.entradasSalidas.patronViajes.patronDetectado) {
+    const p = matriz.entradasSalidas.patronViajes;
+    alertas.push({
+      codigo: 'm4_patron_viajes_frecuentes',
+      descripcionExtra: `Patrón de viajes frecuentes — requiere revisión profesional (hasta ${p.maxEntradasEn12Meses} entradas y ${p.maxDiasAcumuladosEn12Meses} días acumulados de estancia en una ventana de 12 meses).`,
+    });
+  }
 
   if (matriz.historialAdverso.expeditedRemoval) alertas.push({ codigo: 'm4_expedited_removal' });
   if (matriz.historialAdverso.removalOrder) alertas.push({ codigo: 'm4_removal_order' });
@@ -181,7 +264,9 @@ function detectarAlertasModulo4(r: RespuestasModulo3, matriz: MatrizRiesgos): Al
   if (matriz.historialAdverso.otroTipoSinClasificar) alertas.push({ codigo: 'm4_deportacion_generica' });
 
   if (matriz.causalesInadmisibilidad.causal212a6c1) alertas.push({ codigo: 'm4_causal_212a6c1' });
-  if (matriz.causalesInadmisibilidad.causal212a9) alertas.push({ codigo: 'm4_causal_212a9' });
+  if (matriz.causalesInadmisibilidad.causal212a9a) alertas.push({ codigo: 'm4_causal_212a9a' });
+  if (matriz.causalesInadmisibilidad.causal212a9b) alertas.push({ codigo: 'm4_causal_212a9b' });
+  if (matriz.causalesInadmisibilidad.causal212a9c) alertas.push({ codigo: 'm4_causal_212a9c' });
   if (matriz.causalesInadmisibilidad.causal212a2) alertas.push({ codigo: 'm4_causal_212a2' });
 
   if ((r.peticionesAnteriores ?? []).length > 0) alertas.push({ codigo: 'm4_peticion_migratoria_previa' });
@@ -211,7 +296,7 @@ export function sugerirViasInvestigacion(matriz: MatrizRiesgos, r: RespuestasMod
   const dependencias = new Set<string>();
   if (matriz.historialAdverso.algunRegistro || matriz.historialVisas.visaCanceladaRevocada) dependencias.add('CBP FOIA');
   if ((r.peticionesAnteriores ?? []).length > 0 || (r.waiversPerdones ?? []).length > 0) dependencias.add('USCIS FOIA');
-  if (matriz.causalesInadmisibilidad.causal212a9) dependencias.add('OBIM');
+  if (matriz.causalesInadmisibilidad.causal212a9a || matriz.causalesInadmisibilidad.causal212a9b || matriz.causalesInadmisibilidad.causal212a9c) dependencias.add('OBIM');
   if (matriz.historialAdverso.algunRegistro) dependencias.add('ICE');
   if ((r.antecedentesPenales ?? []).some((a) => !!a.fueCondenado)) dependencias.add('EOIR');
   if (matriz.historialVisas.negativasPrevias) dependencias.add('Department of State');
