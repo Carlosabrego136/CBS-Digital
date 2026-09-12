@@ -157,6 +157,12 @@ export interface AnalisisJuridicoInterno {
   estrategiaPreliminar?: string;
   nivelRiesgo?: 'bajo' | 'medio' | 'alto' | 'critico';
   observacionesProfesional?: string;
+  // Solo lectura — quién y cuándo se hizo el último análisis
+  // (punto 12 del documento de mejoras). Nunca se envían de vuelta
+  // al guardar; el backend los ignora si llegan en el body.
+  nombreUsuario?: string;
+  creadoEn?: string;
+  actualizadoEn?: string;
 }
 
 // Secciones cuyos registros el cliente pidió explícitamente que
@@ -336,6 +342,99 @@ export async function guardarModulo3(
 }
 
 // ------------------------------------------------------------
+// RESUMEN MIGRATORIO AUTOMÁTICO — sección M del documento original
+// del Módulo 3 ("Historial migratorio: Visa B1/B2 expedida en 2019...
+// Alertas: Visa cancelada / incidente CBP. Acción sugerida por
+// sistema: ..."). Solo describe hechos capturados y alertas activas;
+// nunca emite una conclusión jurídica — esa decisión queda reservada
+// al profesional que revise el expediente.
+// ------------------------------------------------------------
+function generarResumenMigratorio(
+  r: RespuestasModulo3,
+  alertasActivas: { descripcion: string; severidad: 'informativa' | 'revision' | 'critica' }[]
+): string {
+  const p = r.perfil || {};
+  const frases: string[] = [];
+
+  if (p.tieneVisaActual) {
+    const anio = p.fechaExpedicionVisa ? ` (expedida en ${p.fechaExpedicionVisa.slice(0, 4)})` : '';
+    frases.push(`Cuenta con visa${p.tipoVisa ? ' ' + p.tipoVisa : ''} vigente${anio}.`);
+  } else if (p.haTenidoOtrasVisas) {
+    frases.push('Cuenta con historial de visas estadounidenses anteriores, sin visa vigente actualmente.');
+  } else {
+    frases.push('No cuenta actualmente ni ha contado con visa estadounidense.');
+  }
+
+  const entradas = r.historialEntradas?.length || 0;
+  if (entradas > 0) {
+    frases.push(`${entradas} ingreso${entradas === 1 ? '' : 's'} a Estados Unidos registrado${entradas === 1 ? '' : 's'}.`);
+  }
+
+  const negativas = r.negativasVisa?.length || 0;
+  if (negativas > 0) {
+    frases.push(`${negativas} negativa${negativas === 1 ? '' : 's'} de visa registrada${negativas === 1 ? '' : 's'}.`);
+  }
+
+  if (r.cancelacionesVisa && r.cancelacionesVisa.length > 0) {
+    const c = r.cancelacionesVisa[0];
+    const lugar = [c.lugar, c.autoridad].filter(Boolean).join(', ');
+    frases.push(`Visa cancelada${lugar ? ' por ' + lugar : ''}${c.fecha ? ' en ' + c.fecha.slice(0, 4) : ''}.`);
+  }
+
+  if (r.incidentesCbp && r.incidentesCbp.length > 0) {
+    const detalles: string[] = [];
+    if (r.incidentesCbp.some((i) => i.tomaronHuellas)) detalles.push('toma de huellas');
+    if (r.incidentesCbp.some((i) => i.interrogadoBajoJuramento || i.firmoDeclaracion)) detalles.push('interrogatorio');
+    frases.push(
+      `Cliente refiere ${r.incidentesCbp.length} incidente${r.incidentesCbp.length === 1 ? '' : 's'} con CBP` +
+        (detalles.length ? ` (${detalles.join(' y ')}).` : '.')
+    );
+  }
+
+  if (r.deportacionesRemociones && r.deportacionesRemociones.length > 0) {
+    frases.push(`Registra ${r.deportacionesRemociones.length} procedimiento(s) de remoción/deportación.`);
+  } else {
+    frases.push('No reporta procedimiento de deportación o remoción ni comparecencia ante Immigration Court.');
+  }
+
+  if (r.fraudeRepresentacion && r.fraudeRepresentacion.length > 0) {
+    frases.push('Existe antecedente de posible fraude o falsa representación reportado.');
+  }
+  if (p.afirmoCiudadaniaFalsa) frases.push('Refiere haber afirmado ciudadanía estadounidense sin serlo.');
+
+  if (r.antecedentesPenales && r.antecedentesPenales.length > 0) {
+    frases.push(`${r.antecedentesPenales.length} antecedente(s) penal(es) registrado(s).`);
+  } else {
+    frases.push('Niega arrestos y antecedentes penales.');
+  }
+
+  if (!r.foiaExpedientes || r.foiaExpedientes.length === 0) {
+    frases.push('No cuenta actualmente con expediente CBP/FOIA.');
+  } else {
+    frases.push(`Cuenta con ${r.foiaExpedientes.length} expediente(s) FOIA registrado(s).`);
+  }
+
+  const partes = [`Historial migratorio: ${frases.join(' ')}`];
+
+  if (alertasActivas.length > 0) {
+    partes.push(`Alertas: ${alertasActivas.map((a) => a.descripcion).join('; ')}.`);
+    const hayCritica = alertasActivas.some((a) => a.severidad === 'critica');
+    partes.push(
+      `Acción sugerida por sistema: ${
+        hayCritica
+          ? 'Revisión profesional obligatoria y considerar obtención de FOIA antes de determinar estrategia.'
+          : 'Revisión profesional recomendada antes de determinar estrategia.'
+      }`
+    );
+  } else {
+    partes.push('Alertas: ninguna activa por el momento.');
+    partes.push('Acción sugerida por sistema: sin antecedentes migratorios adversos identificados; continuar conforme a lo planeado.');
+  }
+
+  return partes.join('\n\n') + '\n\nEste resumen se genera automáticamente a partir de los hechos capturados y no constituye un dictamen jurídico.';
+}
+
+// ------------------------------------------------------------
 // Lee las respuestas + alertas activas + semáforo + documentos
 // adjuntos (agrupados por el id de cada registro, para que la
 // pantalla sepa qué archivos mostrar bajo cada renglón).
@@ -368,12 +467,15 @@ export async function obtenerModulo3(expedienteId: string) {
   if (alertasActivas.some((a) => a.severidad === 'critica')) semaforo = 'rojo';
   else if (alertasActivas.some((a) => a.severidad === 'revision')) semaforo = 'amarillo';
 
+  const respuestas = moduloRows[0]?.respuestas ?? {};
+
   return {
-    respuestas: moduloRows[0]?.respuestas ?? {},
+    respuestas,
     completo: moduloRows[0]?.completo ?? false,
     semaforo,
     alertas: alertasRows,
     documentosPorRegistro,
+    resumenAutomatico: generarResumenMigratorio(respuestas, alertasActivas),
   };
 }
 
@@ -460,7 +562,7 @@ export async function guardarAnalisisJuridico(expedienteId: string, usuarioId: s
   return obtenerAnalisisJuridico(expedienteId);
 }
 
-export async function obtenerAnalisisJuridico(expedienteId: string) {
+export async function obtenerAnalisisJuridico(expedienteId: string): Promise<AnalisisJuridicoInterno | null> {
   const rows = await query<any>(
     `SELECT aji.*, u.nombre AS nombre_usuario
      FROM analisis_juridico_interno aji
@@ -468,5 +570,32 @@ export async function obtenerAnalisisJuridico(expedienteId: string) {
      WHERE aji.expediente_id = $1`,
     [expedienteId]
   );
-  return rows[0] || null;
+  const fila = rows[0];
+  if (!fila) return null;
+
+  // IMPORTANTE: la fila viene con columnas snake_case (como están en
+  // la tabla), pero el formulario y el resto del código usan
+  // camelCase (igual que AnalisisJuridicoInterno) — sin esta
+  // traducción, el formulario se veía vacío en cada recarga aunque
+  // el análisis ya estuviera guardado en la base de datos.
+  return {
+    resumenHechos: fila.resumen_hechos ?? undefined,
+    posiblesCausalesInadmisibilidad: fila.posibles_causales_inadmisibilidad ?? undefined,
+    posiblesViolacionesEstatus: fila.posibles_violaciones_estatus ?? undefined,
+    posiblesBarrasCastigos: fila.posibles_barras_castigos ?? undefined,
+    posibleNecesidadWaiver: fila.posible_necesidad_waiver ?? undefined,
+    tipoWaiverPotencial: fila.tipo_waiver_potencial ?? undefined,
+    foiaRecomendado: fila.foia_recomendado ?? undefined,
+    dependenciasAConsultar: fila.dependencias_a_consultar ?? undefined,
+    documentosFaltantes: fila.documentos_faltantes ?? undefined,
+    informacionPendienteConfirmar: fila.informacion_pendiente_confirmar ?? undefined,
+    estrategiaPreliminar: fila.estrategia_preliminar ?? undefined,
+    nivelRiesgo: fila.nivel_riesgo ?? undefined,
+    observacionesProfesional: fila.observaciones_profesional ?? undefined,
+    // Punto 12 del documento de mejoras: "Nombre del usuario que
+    // realizó el análisis", "Fecha del análisis", "Última actualización".
+    nombreUsuario: fila.nombre_usuario ?? undefined,
+    creadoEn: fila.creado_en ?? undefined,
+    actualizadoEn: fila.actualizado_en ?? undefined,
+  };
 }

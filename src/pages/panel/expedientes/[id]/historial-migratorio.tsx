@@ -297,6 +297,7 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
   const [respuestas, setRespuestas] = useState<RespuestasModulo3>({});
   const [semaforo, setSemaforo] = useState<'verde' | 'amarillo' | 'rojo'>('verde');
   const [alertas, setAlertas] = useState<any[]>([]);
+  const [resumenAutomatico, setResumenAutomatico] = useState<string>('');
   const [documentosPorRegistro, setDocumentosPorRegistro] = useState<Record<string, DocumentoRegistro[]>>({});
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -335,6 +336,7 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
         setSemaforo(data.semaforo || 'verde');
         setAlertas(data.alertas || []);
         setDocumentosPorRegistro(data.documentosPorRegistro || {});
+        setResumenAutomatico(data.resumenAutomatico || '');
       });
   }
 
@@ -394,6 +396,7 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
       if (!res.ok) throw new Error(data.error || 'Error al guardar');
       setSemaforo(data.semaforo || 'verde');
       setAlertas(data.alertas || []);
+      setResumenAutomatico(data.resumenAutomatico || '');
       setMensaje('Historial migratorio guardado correctamente.');
     } catch (err: any) {
       setError(err.message || 'No se pudo guardar.');
@@ -413,6 +416,8 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
         body: JSON.stringify(analisis),
       });
       if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (data.analisis) setAnalisis(data.analisis);
       setMensajeAnalisis('Análisis jurídico guardado.');
     } catch {
       setMensajeAnalisis('No se pudo guardar el análisis.');
@@ -456,6 +461,13 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
           </ul>
         )}
       </div>
+
+      {resumenAutomatico && (
+        <div className="border border-line rounded-lg p-4 mb-6 bg-navy-50/40">
+          <p className="text-xs font-medium text-navy uppercase tracking-wide mb-2">Resumen migratorio automático</p>
+          <p className="text-sm text-ink/80 whitespace-pre-line">{resumenAutomatico}</p>
+        </div>
+      )}
 
       {mensaje && <p className="mb-4 text-sm text-navy bg-navy-50 border border-navy-100 rounded-md px-3 py-2">{mensaje}</p>}
       {error && <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
@@ -940,6 +952,14 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
           </div>
           <form onSubmit={guardarAnalisis} className="bg-white p-6 space-y-4">
             {mensajeAnalisis && <p className="text-sm text-navy bg-navy-50 border border-navy-100 rounded-md px-3 py-2">{mensajeAnalisis}</p>}
+
+            {(analisis.nombreUsuario || analisis.creadoEn) && (
+              <p className="text-xs text-ink/50 border-b border-line pb-3">
+                {analisis.nombreUsuario && <>Analizado por: <span className="font-medium">{analisis.nombreUsuario}</span>. </>}
+                {analisis.creadoEn && <>Fecha del análisis: {new Date(analisis.creadoEn).toLocaleString('es-MX')}. </>}
+                {analisis.actualizadoEn && <>Última actualización: {new Date(analisis.actualizadoEn).toLocaleString('es-MX')}.</>}
+              </p>
+            )}
 
             <div>
               <label className="block text-xs text-ink/60 mb-1">Resumen de hechos relevantes</label>
