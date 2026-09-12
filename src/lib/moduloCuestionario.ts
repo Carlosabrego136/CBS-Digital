@@ -34,6 +34,7 @@ export interface PreguntaCuestionario {
   fuenteReutilizacion: string | null;
   preguntaCondicionalId: string | null;
   valorCondicional: string | null;
+  disparaAlertaCodigo: string | null;
 }
 
 export interface SeccionCuestionario {
@@ -186,20 +187,12 @@ async function resolverValorPrellenado(
 }
 
 // ============================================================
-// Mapa de "codigo" de pregunta -> alerta del Módulo 4 (punto 6).
-// Solo cubre las preguntas que en esta primera versión (B1/B2 y
-// FOIA) representan un hecho de riesgo migratorio directo.
+// Punto 6 — qué pregunta dispara qué alerta del Módulo 4. Esto ya
+// NO está fijo en el código: cada pregunta trae su propia columna
+// "dispara_alerta_codigo" (configurable desde Plantillas de
+// Cuestionario), así que conectar una pregunta nueva a una alerta ya
+// existente no requiere tocar código — ver recalcularInconsistenciasYAlertas.
 // ============================================================
-const CODIGO_PREGUNTA_A_ALERTA_M6: Record<string, string> = {
-  nunca_le_han_negado_visa: 'm6_visa_negada',
-  visa_cancelada: 'm6_visa_cancelada',
-  remocion_expulsion: 'm6_remocion_expulsion',
-  reingreso_tras_remocion: 'm6_reingreso_tras_remocion',
-  permanencia_excedida: 'm6_presencia_ilegal',
-  arresto_antecedente: 'm6_arresto',
-  condena: 'm6_condena',
-  peticion_previa: 'm6_peticion_previa',
-};
 
 // Preguntas "gate" (codigo) cuya respuesta 'no' se compara contra un
 // hecho ya capturado en el Módulo 3 para el punto 5 (inconsistencias).
@@ -311,7 +304,8 @@ async function recalcularInconsistenciasYAlertas(
   cuestionarioId: string,
   expedienteId: string,
   respuestasPorCodigo: Map<string, any>,
-  respuestasM3: RespuestasModulo3
+  respuestasM3: RespuestasModulo3,
+  alertasActivadasPorPreguntas: Set<string>
 ) {
   // --- Inconsistencias (propias del cuestionario) ---
   const detectadas: InconsistenciaCuestionario[] = [];
@@ -347,10 +341,7 @@ async function recalcularInconsistenciasYAlertas(
   }
 
   // --- Alertas hacia el Módulo 4 (tabla "alertas" compartida) ---
-  const codigosAlertaDetectados = new Set<string>();
-  for (const [codigoPregunta, codigoAlerta] of Object.entries(CODIGO_PREGUNTA_A_ALERTA_M6)) {
-    if (valorEsSi(respuestasPorCodigo.get(codigoPregunta))) codigosAlertaDetectados.add(codigoAlerta);
-  }
+  const codigosAlertaDetectados = new Set<string>(alertasActivadasPorPreguntas);
   if (detectadas.length > 0) codigosAlertaDetectados.add('m6_informacion_contradictoria');
 
   const activasAlertaRows = await query<{ id: string; regla_codigo: string }>(
@@ -464,6 +455,7 @@ export async function obtenerCuestionario(tramiteId: string, usuarioId: string):
           fuenteReutilizacion: p.fuente_reutilizacion,
           preguntaCondicionalId: p.pregunta_condicional_id,
           valorCondicional: p.valor_condicional,
+          disparaAlertaCodigo: p.dispara_alerta_codigo,
         })
       ),
   }));
@@ -489,17 +481,27 @@ export async function obtenerCuestionario(tramiteId: string, usuarioId: string):
   );
   const respuestasM3 = moduloRows[0]?.respuestas ?? {};
 
-  // Mapa codigo-de-pregunta -> valor de respuesta (para inconsistencias y alertas)
+  // Mapa codigo-de-pregunta -> valor de respuesta (para inconsistencias)
   const respuestasPorCodigo = new Map<string, any>();
+  // Alertas que las respuestas actuales activan, según lo que cada
+  // pregunta tiene configurado en "dispara_alerta_codigo" (punto 6 —
+  // ya no es un mapa fijo en el código, es un dato de la pregunta).
+  const alertasActivadasPorPreguntas = new Set<string>();
   for (const s of secciones) {
     for (const p of s.preguntas) {
-      if (!p.codigo) continue;
       const r = respuestasPorPregunta.get(p.id);
-      if (r) respuestasPorCodigo.set(p.codigo, r.valor);
+      if (p.codigo && r) respuestasPorCodigo.set(p.codigo, r.valor);
+      if (p.disparaAlertaCodigo && r && valorEsSi(r.valor)) alertasActivadasPorPreguntas.add(p.disparaAlertaCodigo);
     }
   }
 
-  const inconsistencias = await recalcularInconsistenciasYAlertas(cuestionarioId, expedienteId, respuestasPorCodigo, respuestasM3);
+  const inconsistencias = await recalcularInconsistenciasYAlertas(
+    cuestionarioId,
+    expedienteId,
+    respuestasPorCodigo,
+    respuestasM3,
+    alertasActivadasPorPreguntas
+  );
 
   // --- Visibilidad (lógica condicional, punto 3) + avance (punto 9) ---
   function esVisible(p: PreguntaCuestionario): boolean {
@@ -669,6 +671,7 @@ export async function listarSeccionesConPreguntas(tipoTramiteCodigo: string) {
         fuenteReutilizacion: p.fuente_reutilizacion,
         preguntaCondicionalId: p.pregunta_condicional_id,
         valorCondicional: p.valor_condicional,
+        disparaAlertaCodigo: p.dispara_alerta_codigo,
       })),
   }));
 }
@@ -705,13 +708,14 @@ export async function crearPreguntaCuestionario(
     fuenteReutilizacion?: string | null;
     preguntaCondicionalId?: string | null;
     valorCondicional?: string | null;
+    disparaAlertaCodigo?: string | null;
   },
   usuarioId: string
 ) {
   const rows = await query<{ id: string }>(
     `INSERT INTO cuestionario_preguntas
-       (seccion_id, codigo, texto, tipo_respuesta, opciones, obligatoria, orden, fuente_reutilizacion, pregunta_condicional_id, valor_condicional)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10) RETURNING id`,
+       (seccion_id, codigo, texto, tipo_respuesta, opciones, obligatoria, orden, fuente_reutilizacion, pregunta_condicional_id, valor_condicional, dispara_alerta_codigo)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11) RETURNING id`,
     [
       datos.seccionId,
       datos.codigo || null,
@@ -723,6 +727,7 @@ export async function crearPreguntaCuestionario(
       datos.fuenteReutilizacion || null,
       datos.preguntaCondicionalId || null,
       datos.valorCondicional || null,
+      datos.disparaAlertaCodigo || null,
     ]
   );
   await registrarCambios('cuestionario_pregunta', rows[0].id, {}, { texto: datos.texto }, usuarioId);
@@ -741,6 +746,7 @@ export async function actualizarPreguntaCuestionario(
     fuenteReutilizacion: string | null;
     preguntaCondicionalId: string | null;
     valorCondicional: string | null;
+    disparaAlertaCodigo: string | null;
   }>,
   usuarioId: string
 ) {
@@ -753,6 +759,9 @@ export async function actualizarPreguntaCuestionario(
        orden = COALESCE($6, orden),
        activa = COALESCE($7, activa),
        fuente_reutilizacion = COALESCE($8, fuente_reutilizacion),
+       pregunta_condicional_id = CASE WHEN $9 THEN $10 ELSE pregunta_condicional_id END,
+       valor_condicional = COALESCE($11, valor_condicional),
+       dispara_alerta_codigo = CASE WHEN $12 THEN $13 ELSE dispara_alerta_codigo END,
        actualizado_en = now()
      WHERE id = $1`,
     [
@@ -764,6 +773,11 @@ export async function actualizarPreguntaCuestionario(
       datos.orden ?? null,
       datos.activa ?? null,
       datos.fuenteReutilizacion ?? null,
+      'preguntaCondicionalId' in datos,
+      datos.preguntaCondicionalId ?? null,
+      datos.valorCondicional ?? null,
+      'disparaAlertaCodigo' in datos,
+      datos.disparaAlertaCodigo ?? null,
     ]
   );
   await registrarCambios('cuestionario_pregunta', id, {}, datos, usuarioId);

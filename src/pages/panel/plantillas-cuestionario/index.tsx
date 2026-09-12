@@ -30,6 +30,7 @@ interface Pregunta {
   fuenteReutilizacion: string | null;
   preguntaCondicionalId: string | null;
   valorCondicional: string | null;
+  disparaAlertaCodigo: string | null;
 }
 interface Seccion {
   id: string;
@@ -53,6 +54,17 @@ const FUENTES_REUTILIZACION = [
   'm3_peticiones', 'm3_entradas_salidas',
 ];
 
+// Alertas del Módulo 4 que una pregunta Sí/No puede disparar cuando se
+// contesta "Sí" (punto 6). Conectar una pregunta nueva a una de estas
+// es solo elegirla aquí — no requiere tocar código. Si más adelante se
+// necesita una alerta nueva que no esté en esta lista, esa sí requiere
+// agregarla a la tabla reglas_alerta primero.
+const ALERTAS_MODULO6 = [
+  '', 'm6_visa_negada', 'm6_visa_cancelada', 'm6_remocion_expulsion', 'm6_presencia_ilegal',
+  'm6_reingreso_tras_remocion', 'm6_arresto', 'm6_condena', 'm6_problema_puerto_entrada',
+  'm6_peticion_previa', 'm6_viajes_frecuentes',
+];
+
 export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsuario }: Props) {
   const [tipos, setTipos] = useState<TipoTramite[]>([]);
   const [seleccionado, setSeleccionado] = useState('');
@@ -68,6 +80,9 @@ export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsua
   const [nuevaPreguntaObligatoria, setNuevaPreguntaObligatoria] = useState(false);
   const [nuevaPreguntaCodigo, setNuevaPreguntaCodigo] = useState('');
   const [nuevaPreguntaFuente, setNuevaPreguntaFuente] = useState('');
+  const [nuevaPreguntaCondicionalId, setNuevaPreguntaCondicionalId] = useState('');
+  const [nuevaPreguntaValorCondicional, setNuevaPreguntaValorCondicional] = useState('');
+  const [nuevaPreguntaAlerta, setNuevaPreguntaAlerta] = useState('');
   const [nuevaPreguntaOpciones, setNuevaPreguntaOpciones] = useState('');
 
   function cargar() {
@@ -221,6 +236,7 @@ export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsua
                         <p className="text-[11px] text-ink/40 mt-0.5">Condicional — solo se muestra si otra pregunta responde "{p.valorCondicional}"</p>
                       )}
                       {p.fuenteReutilizacion && <p className="text-[11px] text-ink/40 mt-0.5">Prellenado desde: {p.fuenteReutilizacion}</p>}
+                      {p.disparaAlertaCodigo && <p className="text-[11px] text-ink/40 mt-0.5">Si responde "Sí", dispara: {p.disparaAlertaCodigo}</p>}
                     </li>
                   ))}
                 </ul>
@@ -269,6 +285,76 @@ export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsua
                     <textarea value={nuevaPreguntaOpciones} onChange={(e) => setNuevaPreguntaOpciones(e.target.value)} rows={3} className="w-full border border-line rounded-md px-2 py-1.5 text-sm" placeholder={'si|Sí\nno|No'} />
                   </div>
                 )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-line pt-3">
+                  <div>
+                    <label className="block text-xs text-ink/60 mb-1">Mostrar solo si (condicional)</label>
+                    <select
+                      value={nuevaPreguntaCondicionalId}
+                      onChange={(e) => {
+                        setNuevaPreguntaCondicionalId(e.target.value);
+                        setNuevaPreguntaValorCondicional('');
+                      }}
+                      className="w-full border border-line rounded-md px-2 py-1.5 text-sm"
+                    >
+                      <option value="">— Siempre visible —</option>
+                      {seccion.preguntas.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.texto}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {nuevaPreguntaCondicionalId && (
+                    <div>
+                      <label className="block text-xs text-ink/60 mb-1">Cuando esa pregunta responda</label>
+                      {(() => {
+                        const padre = seccion.preguntas.find((p) => p.id === nuevaPreguntaCondicionalId);
+                        if (padre?.tipoRespuesta === 'si_no') {
+                          return (
+                            <select value={nuevaPreguntaValorCondicional} onChange={(e) => setNuevaPreguntaValorCondicional(e.target.value)} className="w-full border border-line rounded-md px-2 py-1.5 text-sm">
+                              <option value="">—</option>
+                              <option value="si">Sí</option>
+                              <option value="no">No</option>
+                            </select>
+                          );
+                        }
+                        if (padre?.tipoRespuesta === 'seleccion_unica' && padre.opciones.length > 0) {
+                          return (
+                            <select value={nuevaPreguntaValorCondicional} onChange={(e) => setNuevaPreguntaValorCondicional(e.target.value)} className="w-full border border-line rounded-md px-2 py-1.5 text-sm">
+                              <option value="">—</option>
+                              {padre.opciones.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        }
+                        return (
+                          <input
+                            type="text"
+                            value={nuevaPreguntaValorCondicional}
+                            onChange={(e) => setNuevaPreguntaValorCondicional(e.target.value)}
+                            className="w-full border border-line rounded-md px-2 py-1.5 text-sm"
+                            placeholder="valor exacto de la respuesta"
+                          />
+                        );
+                      })()}
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs text-ink/60 mb-1">Si responde "Sí", dispara alerta</label>
+                    <select value={nuevaPreguntaAlerta} onChange={(e) => setNuevaPreguntaAlerta(e.target.value)} className="w-full border border-line rounded-md px-2 py-1.5 text-sm">
+                      {ALERTAS_MODULO6.map((a) => (
+                        <option key={a} value={a}>
+                          {a || '— Ninguna —'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <button
                   disabled={!nuevaPreguntaTexto}
                   onClick={async () => {
@@ -282,6 +368,9 @@ export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsua
                       obligatoria: nuevaPreguntaObligatoria,
                       orden: seccion.preguntas.length + 1,
                       fuenteReutilizacion: nuevaPreguntaFuente || null,
+                      preguntaCondicionalId: nuevaPreguntaCondicionalId || null,
+                      valorCondicional: nuevaPreguntaValorCondicional || null,
+                      disparaAlertaCodigo: nuevaPreguntaAlerta || null,
                     });
                     if (ok) {
                       setNuevaPreguntaTexto('');
@@ -289,16 +378,15 @@ export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsua
                       setNuevaPreguntaFuente('');
                       setNuevaPreguntaOpciones('');
                       setNuevaPreguntaObligatoria(false);
+                      setNuevaPreguntaCondicionalId('');
+                      setNuevaPreguntaValorCondicional('');
+                      setNuevaPreguntaAlerta('');
                     }
                   }}
                   className="text-sm border border-line rounded-md px-4 py-2 hover:bg-navy-50 transition-colors disabled:opacity-60"
                 >
                   + Agregar pregunta
                 </button>
-                <p className="text-[11px] text-ink/40">
-                  Para preguntas condicionales o vincularlas a otra respuesta específica, pide el ajuste directo por este medio — el
-                  constructor visual de condicionales queda para una siguiente vuelta (ver nota de simplificaciones).
-                </p>
               </div>
             </div>
           )}

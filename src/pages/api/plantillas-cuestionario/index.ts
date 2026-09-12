@@ -51,8 +51,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ id });
       }
       if (accion === 'crear_pregunta') {
-        const { seccionId, codigo, texto, tipoRespuesta, opciones, obligatoria, orden, fuenteReutilizacion, preguntaCondicionalId, valorCondicional } =
-          req.body;
+        const {
+          seccionId,
+          codigo,
+          texto,
+          tipoRespuesta,
+          opciones,
+          obligatoria,
+          orden,
+          fuenteReutilizacion,
+          preguntaCondicionalId,
+          valorCondicional,
+          disparaAlertaCodigo,
+        } = req.body;
         if (!seccionId || !texto || !tipoRespuesta) return res.status(400).json({ error: 'Falta seccionId, texto o tipoRespuesta' });
         const id = await crearPreguntaCuestionario(
           {
@@ -66,6 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             fuenteReutilizacion: fuenteReutilizacion || null,
             preguntaCondicionalId: preguntaCondicionalId || null,
             valorCondicional: valorCondicional || null,
+            disparaAlertaCodigo: disparaAlertaCodigo || null,
           },
           session.user.id
         );
