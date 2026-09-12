@@ -73,3 +73,33 @@ export async function enviarCorreoInvitacion(correoDestino: string, nombre: stri
     `,
   });
 }
+
+// Botón "Solicitar información al cliente" del Módulo 4 (Evaluación de
+// Elegibilidad y Riesgos, punto 11). Solo se listan descripciones
+// genéricas de lo que falta — nunca datos internos como alertas,
+// causales de inadmisibilidad o la evaluación profesional.
+export async function enviarCorreoInformacionFaltante(correoDestino: string, nombreCliente: string, pendientes: string[]) {
+  const client = getClient();
+
+  if (!client) {
+    console.log(`[Resend no configurado] Solicitud de información para ${correoDestino}: ${pendientes.join(' | ')}`);
+    return;
+  }
+
+  await client.emails.send({
+    from: REMITENTE,
+    to: correoDestino,
+    subject: 'Cross-Border Solutions — información pendiente para tu expediente',
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #0F2247;">Información pendiente</h2>
+        <p>Hola ${nombreCliente || ''},</p>
+        <p>Para continuar con la revisión de tu caso, necesitamos que nos ayudes con lo siguiente:</p>
+        <ul style="color:#333;">
+          ${pendientes.map((p) => `<li>${p}</li>`).join('')}
+        </ul>
+        <p style="color:#666;font-size:13px;">Puedes responder este correo o comunicarte directamente con tu responsable en Cross-Border Solutions.</p>
+      </div>
+    `,
+  });
+}

@@ -95,6 +95,13 @@ export default function ExpedienteResumen({ nombreUsuario, permisosUsuario, expe
           <h3 className="font-display text-base text-navy mb-1">Perfil e Historial Migratorio</h3>
           <p className="text-xs text-ink/50">Módulo 3 — captura de antecedentes, semáforo y alertas</p>
         </a>
+        <a
+          href={`/panel/expedientes/${expediente.id}/evaluacion-riesgos`}
+          className="bg-white border border-line rounded-lg p-6 hover:border-gold-400 transition-colors block"
+        >
+          <h3 className="font-display text-base text-navy mb-1">Evaluación de Elegibilidad y Riesgos</h3>
+          <p className="text-xs text-ink/50">Módulo 4 — matriz de riesgos, causales de inadmisibilidad y evaluación profesional</p>
+        </a>
       </div>
     </PanelLayout>
   );
