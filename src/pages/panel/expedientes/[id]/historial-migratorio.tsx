@@ -1,20 +1,25 @@
 // src/pages/panel/expedientes/[id]/historial-migratorio.tsx
 //
-// FASE C — Formulario visual del Módulo 3 (Perfil e Historial Migratorio).
-// Se conecta al endpoint ya existente: /api/expedientes/[id]/modulo-3
-// que a su vez usa src/lib/moduloHistorialMigratorio.ts
-//
-// No modifica ninguna página existente (solo se agrega un link nuevo
-// en clientes/[id].tsx para llegar aquí — ver nota al final).
+// Formulario del Módulo 3 (Perfil e Historial Migratorio), versión
+// ampliada con las mejoras pedidas por el cliente: campos nuevos por
+// sección, documentos adjuntos por registro individual, y la sección
+// de Análisis Jurídico Interno (visible solo con permiso profesional).
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
 import PanelLayout from '@/components/PanelLayout';
-import type { RespuestasModulo3 } from '@/lib/moduloHistorialMigratorio';
+import type { RespuestasModulo3, AnalisisJuridicoInterno } from '@/lib/moduloHistorialMigratorio';
+
+interface DocumentoRegistro {
+  id: string;
+  nombre_archivo: string;
+  url_archivo: string;
+  subido_en: string;
+}
 
 interface Props {
   nombreUsuario: string;
@@ -22,6 +27,7 @@ interface Props {
   expediente: { id: string; numero_expediente: string; tipo_tramite: string; cliente_id: string };
   clienteNombre: string;
   puedeEditar: boolean;
+  puedeVerAnalisisJuridico: boolean;
 }
 
 // ------------------------------------------------------------
@@ -33,6 +39,11 @@ interface CampoConfig {
   label: string;
   tipo: TipoCampo;
   opciones?: { value: string; label: string }[];
+}
+
+function generarId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function renderCampo(campo: CampoConfig, valor: any, onChange: (v: any) => void) {
@@ -61,14 +72,7 @@ function renderCampo(campo: CampoConfig, valor: any, onChange: (v: any) => void)
     );
   }
   if (campo.tipo === 'textarea') {
-    return (
-      <textarea
-        value={valor || ''}
-        onChange={(e) => onChange(e.target.value)}
-        rows={2}
-        className={base}
-      />
-    );
+    return <textarea value={valor || ''} onChange={(e) => onChange(e.target.value)} rows={2} className={base} />;
   }
   return (
     <input
@@ -80,7 +84,109 @@ function renderCampo(campo: CampoConfig, valor: any, onChange: (v: any) => void)
   );
 }
 
+// ------------------------------------------------------------
+// Mini-widget de documentos por registro (punto 1 de las mejoras)
+// ------------------------------------------------------------
+function DocumentosDeRegistro({
+  expedienteId,
+  entidadTipo,
+  entidadId,
+  documentos,
+  onSubido,
+  disabled,
+}: {
+  expedienteId: string;
+  entidadTipo: string;
+  entidadId: string;
+  documentos: DocumentoRegistro[];
+  onSubido: () => void;
+  disabled?: boolean;
+}) {
+  const [subiendo, setSubiendo] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function manejarArchivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+
+    const extension = archivo.name.split('.').pop()?.toLowerCase();
+    if (!['pdf', 'jpg', 'jpeg', 'png'].includes(extension || '')) {
+      alert('Solo se permiten archivos PDF, JPG, JPEG o PNG.');
+      return;
+    }
+
+    setSubiendo(true);
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(archivo);
+    });
+
+    try {
+      const res = await fetch(`/api/expedientes/${expedienteId}/documentos-migratorios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entidadTipo,
+          entidadId,
+          nombreArchivo: archivo.name,
+          archivoBase64: base64,
+          tipoMime: archivo.type,
+        }),
+      });
+      if (res.ok) onSubido();
+      else alert('No se pudo subir el documento.');
+    } finally {
+      setSubiendo(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  async function descargar(documentoId: string) {
+    const res = await fetch(`/api/expedientes/${expedienteId}/documentos-migratorios?descargarId=${documentoId}`);
+    const data = await res.json();
+    if (data.url) window.open(data.url, '_blank');
+  }
+
+  async function quitar(documentoId: string) {
+    if (!confirm('¿Quitar este documento del registro?')) return;
+    await fetch(`/api/expedientes/${expedienteId}/documentos-migratorios?documentoId=${documentoId}`, { method: 'DELETE' });
+    onSubido();
+  }
+
+  return (
+    <div className="col-span-2 border-t border-dashed border-line pt-2 mt-1">
+      <p className="text-xs text-ink/50 mb-1">Documentos</p>
+      {documentos.length > 0 && (
+        <ul className="space-y-1 mb-2">
+          {documentos.map((doc) => (
+            <li key={doc.id} className="flex items-center justify-between text-xs bg-navy-50 rounded px-2 py-1">
+              <button type="button" onClick={() => descargar(doc.id)} className="text-navy hover:underline truncate max-w-[70%] text-left">
+                📎 {doc.nombre_archivo}
+              </button>
+              {!disabled && (
+                <button type="button" onClick={() => quitar(doc.id)} className="text-red-600 hover:underline">
+                  Quitar
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!disabled && (
+        <label className="inline-block text-xs border border-line rounded-md px-2.5 py-1 cursor-pointer hover:bg-navy-50">
+          {subiendo ? 'Subiendo…' : '+ Adjuntar documento'}
+          <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={manejarArchivo} disabled={subiendo} />
+        </label>
+      )}
+    </div>
+  );
+}
+
 function SeccionRepetible({
+  expedienteId,
+  entidadTipo,
   titulo,
   descripcion,
   campos,
@@ -88,7 +194,11 @@ function SeccionRepetible({
   onChange,
   etiquetaAgregar,
   disabled,
+  documentosPorRegistro,
+  onDocumentosChange,
 }: {
+  expedienteId: string;
+  entidadTipo: string;
   titulo: string;
   descripcion?: string;
   campos: CampoConfig[];
@@ -96,13 +206,15 @@ function SeccionRepetible({
   onChange: (items: any[]) => void;
   etiquetaAgregar?: string;
   disabled?: boolean;
+  documentosPorRegistro: Record<string, DocumentoRegistro[]>;
+  onDocumentosChange: () => void;
 }) {
   const actualizar = (idx: number, key: string, value: any) => {
     const nuevos = items.slice();
     nuevos[idx] = { ...nuevos[idx], [key]: value };
     onChange(nuevos);
   };
-  const agregar = () => onChange([...(items || []), {}]);
+  const agregar = () => onChange([...(items || []), { id: generarId() }]);
   const quitar = (idx: number) => onChange(items.filter((_, i) => i !== idx));
 
   return (
@@ -112,13 +224,9 @@ function SeccionRepetible({
       {(!items || items.length === 0) && <p className="text-sm text-ink/40 mb-3">Sin registros.</p>}
       <div className="space-y-4">
         {(items || []).map((item, idx) => (
-          <div key={idx} className="border border-line rounded-md p-4 relative">
+          <div key={item.id || idx} className="border border-line rounded-md p-4 relative">
             {!disabled && (
-              <button
-                type="button"
-                onClick={() => quitar(idx)}
-                className="absolute top-2 right-2 text-xs text-red-600 hover:underline"
-              >
+              <button type="button" onClick={() => quitar(idx)} className="absolute top-2 right-2 text-xs text-red-600 hover:underline">
                 Quitar
               </button>
             )}
@@ -133,16 +241,22 @@ function SeccionRepetible({
                   )}
                 </div>
               ))}
+              {item.id && (
+                <DocumentosDeRegistro
+                  expedienteId={expedienteId}
+                  entidadTipo={entidadTipo}
+                  entidadId={item.id}
+                  documentos={documentosPorRegistro[item.id] || []}
+                  onSubido={onDocumentosChange}
+                  disabled={disabled}
+                />
+              )}
             </div>
           </div>
         ))}
       </div>
       {!disabled && (
-        <button
-          type="button"
-          onClick={agregar}
-          className="mt-3 text-sm border border-line rounded-md px-3 py-1.5 hover:bg-navy-50 transition-colors"
-        >
+        <button type="button" onClick={agregar} className="mt-3 text-sm border border-line rounded-md px-3 py-1.5 hover:bg-navy-50 transition-colors">
           + {etiquetaAgregar || 'Agregar otro registro'}
         </button>
       )}
@@ -161,26 +275,44 @@ const SEMAFORO_TEXTO: Record<string, string> = {
   rojo: '🔴 Revisión obligatoria — antecedentes de alto riesgo detectados',
 };
 
-export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario, expediente, clienteNombre, puedeEditar }: Props) {
+export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario, expediente, clienteNombre, puedeEditar, puedeVerAnalisisJuridico }: Props) {
   const router = useRouter();
   const [respuestas, setRespuestas] = useState<RespuestasModulo3>({});
   const [semaforo, setSemaforo] = useState<'verde' | 'amarillo' | 'rojo'>('verde');
   const [alertas, setAlertas] = useState<any[]>([]);
+  const [documentosPorRegistro, setDocumentosPorRegistro] = useState<Record<string, DocumentoRegistro[]>>({});
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch(`/api/expedientes/${expediente.id}/modulo-3`)
+  const [analisis, setAnalisis] = useState<AnalisisJuridicoInterno>({});
+  const [guardandoAnalisis, setGuardandoAnalisis] = useState(false);
+  const [mensajeAnalisis, setMensajeAnalisis] = useState<string | null>(null);
+
+  function cargarModulo3() {
+    return fetch(`/api/expedientes/${expediente.id}/modulo-3`)
       .then((r) => r.json())
       .then((data) => {
         setRespuestas(data.respuestas || {});
         setSemaforo(data.semaforo || 'verde');
         setAlertas(data.alertas || []);
-      })
+        setDocumentosPorRegistro(data.documentosPorRegistro || {});
+      });
+  }
+
+  useEffect(() => {
+    cargarModulo3()
       .catch(() => setError('No se pudo cargar el historial migratorio.'))
       .finally(() => setCargando(false));
+
+    if (puedeVerAnalisisJuridico) {
+      fetch(`/api/expedientes/${expediente.id}/analisis-juridico`)
+        .then((r) => r.json())
+        .then((data) => setAnalisis(data.analisis || {}))
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expediente.id]);
 
   const perfil = respuestas.perfil || {};
@@ -214,6 +346,25 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
     }
   };
 
+  const guardarAnalisis = async (e: FormEvent) => {
+    e.preventDefault();
+    setGuardandoAnalisis(true);
+    setMensajeAnalisis(null);
+    try {
+      const res = await fetch(`/api/expedientes/${expediente.id}/analisis-juridico`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(analisis),
+      });
+      if (!res.ok) throw new Error();
+      setMensajeAnalisis('Análisis jurídico guardado.');
+    } catch {
+      setMensajeAnalisis('No se pudo guardar el análisis.');
+    } finally {
+      setGuardandoAnalisis(false);
+    }
+  };
+
   if (cargando) {
     return (
       <PanelLayout titulo="Historial Migratorio" nombreUsuario={nombreUsuario} permisos={permisosUsuario}>
@@ -221,6 +372,8 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
       </PanelLayout>
     );
   }
+
+  const seccionRepetibleProps = { expedienteId: expediente.id, documentosPorRegistro, onDocumentosChange: cargarModulo3, disabled: !puedeEditar };
 
   return (
     <PanelLayout
@@ -233,12 +386,11 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
         ← Volver a la ficha del cliente
       </button>
 
-      {/* Semáforo + alertas */}
       <div className={`border rounded-lg p-4 mb-6 ${SEMAFORO_ESTILO[semaforo]}`}>
         <p className="font-medium text-sm">{SEMAFORO_TEXTO[semaforo]}</p>
         <p className="text-xs mt-1 opacity-80">
           Este semáforo no constituye un dictamen jurídico. Es una clasificación interna basada en los hechos
-          capturados; la decisión final corresponde al profesional que revise el expediente.
+          capturados; la determinación final corresponde al profesional que revise el expediente.
         </p>
         {alertas.filter((a) => !a.resuelta).length > 0 && (
           <ul className="mt-3 space-y-1 text-sm">
@@ -319,9 +471,7 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
               <div>
                 <label className="block text-xs text-red-700 mb-1">¿Afirmó ser ciudadano sin serlo?</label>
                 {renderCampo({ key: 'afirmoCiudadaniaFalsa', label: '', tipo: 'boolean' }, perfil.afirmoCiudadaniaFalsa, (v) => setPerfil('afirmoCiudadaniaFalsa', v))}
-                {perfil.afirmoCiudadaniaFalsa && (
-                  <p className="text-xs text-red-700 mt-1">⚠ Revisión jurídica obligatoria.</p>
-                )}
+                {perfil.afirmoCiudadaniaFalsa && <p className="text-xs text-red-700 mt-1">⚠ Revisión jurídica obligatoria.</p>}
               </div>
             </div>
           </div>
@@ -368,13 +518,13 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
           </div>
         </div>
 
-        {/* Secciones repetibles */}
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="visasAnteriores"
           titulo="Otras visas o estatus anteriores"
           items={respuestas.visasAnteriores || []}
           onChange={(v) => setArray('visasAnteriores', v)}
           etiquetaAgregar="Agregar otra visa"
-          disabled={!puedeEditar}
           campos={[
             { key: 'tipoVisa', label: 'Tipo de visa', tipo: 'text' },
             { key: 'numeroVisa', label: 'Número de visa', tipo: 'text' },
@@ -385,13 +535,14 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
         />
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="historialEntradas"
           titulo="B. Historial de entradas a Estados Unidos"
           items={respuestas.historialEntradas || []}
           onChange={(v) => setArray('historialEntradas', v)}
           etiquetaAgregar="Agregar otra entrada"
-          disabled={!puedeEditar}
           campos={[
-            { key: 'fechaEntrada', label: 'Fecha de entrada', tipo: 'date' },
+            { key: 'fechaEntrada', label: 'Fecha de admisión', tipo: 'date' },
             { key: 'puertoEntrada', label: 'Puerto de entrada', tipo: 'text' },
             {
               key: 'tipoIngreso', label: 'Tipo de ingreso', tipo: 'select', opciones: [
@@ -404,20 +555,38 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
                 { value: 'otro', label: 'Otro' },
               ]
             },
-            { key: 'estatusVisaUtilizada', label: 'Estatus/visa utilizada', tipo: 'text' },
-            { key: 'fechaSalida', label: 'Fecha de salida', tipo: 'date' },
+            { key: 'estatusVisaUtilizada', label: 'Visa/estatus utilizado', tipo: 'text' },
+            { key: 'numeroI94', label: 'Número I-94', tipo: 'text' },
+            { key: 'admitUntilDate', label: 'Admit Until Date (permanencia autorizada)', tipo: 'date' },
+            { key: 'fechaSalida', label: 'Fecha real de salida', tipo: 'date' },
             { key: 'tiempoPermanecido', label: 'Tiempo permanecido', tipo: 'text' },
+            {
+              key: 'resultadoEntrada', label: 'Resultado de la entrada', tipo: 'select', opciones: [
+                { value: 'admitido', label: 'Admitido' },
+                { value: 'parole', label: 'Parole' },
+                { value: 'inspeccion_secundaria', label: 'Inspección secundaria' },
+                { value: 'withdrawal', label: 'Withdrawal of Application for Admission' },
+                { value: 'expedited_removal', label: 'Expedited Removal' },
+                { value: 'entrada_rechazada', label: 'Entrada rechazada' },
+                { value: 'otro', label: 'Otro' },
+              ]
+            },
             { key: 'observaciones', label: 'Observaciones', tipo: 'textarea' },
           ]}
         />
+        <p className="text-xs text-ink/40 -mt-4">
+          Si "Admit Until Date" y "Fecha real de salida" indican que la salida fue posterior a lo autorizado, el
+          sistema genera automáticamente una alerta de posible overstay — no es una determinación jurídica.
+        </p>
 
         {perfil.permanenciaExcedidaAlgunaVez && (
           <SeccionRepetible
+            {...seccionRepetibleProps}
+            entidadTipo="permanenciasExcedidas"
             titulo="Detalle de permanencias excedidas"
             items={respuestas.permanenciasExcedidas || []}
             onChange={(v) => setArray('permanenciasExcedidas', v)}
             etiquetaAgregar="Agregar otro periodo"
-            disabled={!puedeEditar}
             campos={[
               { key: 'fechaEntrada', label: 'Fecha de entrada', tipo: 'date' },
               { key: 'fechaAutorizadoHasta', label: 'Autorizado hasta', tipo: 'date' },
@@ -430,132 +599,171 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
         )}
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="negativasVisa"
           titulo="D. Negativas de visa"
           items={respuestas.negativasVisa || []}
           onChange={(v) => setArray('negativasVisa', v)}
           etiquetaAgregar="Agregar otra negativa"
-          disabled={!puedeEditar}
           campos={[
             { key: 'fecha', label: 'Fecha', tipo: 'date' },
             { key: 'consulado', label: 'Consulado', tipo: 'text' },
             { key: 'tipoVisaSolicitada', label: 'Tipo de visa solicitada', tipo: 'text' },
             {
-              key: 'seccionLegal', label: 'Sección legal', tipo: 'select', opciones: [
-                { value: '214b', label: '214(b)' }, { value: '221g', label: '221(g)' },
-                { value: '212a', label: '212(a)' }, { value: 'desconocida', label: 'Desconocida' },
-                { value: 'otra', label: 'Otra' },
+              key: 'seccionLegal', label: 'Fundamento o sección legal', tipo: 'select', opciones: [
+                { value: '214b', label: 'INA 214(b)' }, { value: '221g', label: 'INA 221(g)' },
+                { value: '212a6c1', label: 'INA 212(a)(6)(C)(i)' }, { value: '212a9', label: 'INA 212(a)(9)' },
+                { value: 'otro', label: 'Otro' }, { value: 'desconocido', label: 'Desconocido' },
               ]
             },
-            { key: 'numeroNegativasAnteriores', label: 'Número de negativas anteriores', tipo: 'number' },
+            { key: 'numeroNegativasAnteriores', label: 'Número total de negativas anteriores', tipo: 'number' },
+            { key: 'documentoEntregadoConsulado', label: '¿Documento entregado por el consulado?', tipo: 'boolean' },
             { key: 'explicacion', label: 'Explicación', tipo: 'textarea' },
           ]}
         />
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="cancelacionesVisa"
           titulo="E. Cancelación o revocación de visa"
           items={respuestas.cancelacionesVisa || []}
           onChange={(v) => setArray('cancelacionesVisa', v)}
           etiquetaAgregar="Agregar otra cancelación"
-          disabled={!puedeEditar}
           campos={[
             { key: 'fecha', label: 'Fecha', tipo: 'date' },
-            { key: 'lugar', label: 'Lugar', tipo: 'text' },
+            { key: 'tipoVisa', label: 'Tipo de visa', tipo: 'text' },
+            { key: 'numeroVisa', label: 'Número de visa (si se conoce)', tipo: 'text' },
             {
               key: 'autoridad', label: 'Autoridad', tipo: 'select', opciones: [
                 { value: 'cbp', label: 'CBP' }, { value: 'consulado', label: 'Consulado' },
                 { value: 'embajada', label: 'Embajada' }, { value: 'otra', label: 'Otra' },
               ]
             },
-            { key: 'ocurrioEnPuertoEntrada', label: '¿Ocurrió en puerto de entrada?', tipo: 'boolean' },
+            { key: 'lugar', label: 'Lugar', tipo: 'text' },
+            { key: 'motivoIndicado', label: 'Motivo informado', tipo: 'text' },
+            { key: 'fundamentoLegal', label: 'Fundamento legal (si fue indicado)', tipo: 'text' },
+            { key: 'ocurrioEnPuertoEntrada', label: '¿Ocurrió en consulado o puerto de entrada?', tipo: 'boolean' },
+            { key: 'seEstampoLeyenda', label: '¿Se estampó/anotó alguna leyenda en la visa?', tipo: 'boolean' },
             { key: 'lePermitieronIngresar', label: '¿Le permitieron ingresar?', tipo: 'boolean' },
             { key: 'fueRegresadoPaisProcedencia', label: '¿Fue regresado a su país?', tipo: 'boolean' },
-            { key: 'firmoDocumentos', label: '¿Firmó documentos?', tipo: 'boolean' },
-            { key: 'leTomaronHuellas', label: '¿Le tomaron huellas?', tipo: 'boolean' },
+            { key: 'firmoDocumentos', label: '¿Se entregó documento / firmó?', tipo: 'boolean' },
             { key: 'fueInterrogado', label: '¿Fue interrogado?', tipo: 'boolean' },
-            { key: 'motivoIndicado', label: 'Motivo indicado', tipo: 'text' },
-            { key: 'explicacionDetallada', label: 'Explicación detallada', tipo: 'textarea' },
+            { key: 'resultado', label: 'Resultado', tipo: 'text' },
+            { key: 'explicacionDetallada', label: 'Explicación', tipo: 'textarea' },
           ]}
         />
 
         <SeccionRepetible
-          titulo="F. Problemas con CBP"
+          {...seccionRepetibleProps}
+          entidadTipo="incidentesCbp"
+          titulo="F. Problemas / incidentes con CBP"
           items={respuestas.incidentesCbp || []}
           onChange={(v) => setArray('incidentesCbp', v)}
           etiquetaAgregar="Agregar otro incidente"
-          disabled={!puedeEditar}
           campos={[
             { key: 'fecha', label: 'Fecha', tipo: 'date' },
             { key: 'puertoEntrada', label: 'Puerto de entrada', tipo: 'text' },
             { key: 'duracionAproximada', label: 'Duración aproximada', tipo: 'text' },
+            {
+              key: 'tipoInspeccion', label: 'Inspección', tipo: 'select', opciones: [
+                { value: 'primaria', label: 'Primaria' }, { value: 'secundaria', label: 'Secundaria' },
+              ]
+            },
             { key: 'motivo', label: 'Motivo', tipo: 'textarea' },
             { key: 'revisaronTelefono', label: '¿Revisaron teléfono?', tipo: 'boolean' },
             { key: 'revisaronEquipaje', label: '¿Revisaron equipaje?', tipo: 'boolean' },
             { key: 'tomaronHuellas', label: '¿Tomaron huellas?', tipo: 'boolean' },
             { key: 'tomaronFotografia', label: '¿Tomaron fotografía?', tipo: 'boolean' },
             { key: 'firmoDeclaracion', label: '¿Firmó declaración?', tipo: 'boolean' },
+            { key: 'interrogadoBajoJuramento', label: '¿Interrogado bajo juramento?', tipo: 'boolean' },
+            { key: 'leEntregaronDocumento', label: '¿Le entregaron algún documento?', tipo: 'boolean' },
+            { key: 'tipoNumeroDocumento', label: 'Tipo/número del documento', tipo: 'text' },
+            { key: 'cancelaronVisa', label: '¿Cancelaron visa?', tipo: 'boolean' },
+            { key: 'retiroSolicitudAdmision', label: '¿Retiró solicitud de admisión?', tipo: 'boolean' },
+            { key: 'determinoInadmisibilidad', label: '¿Se determinó inadmisibilidad?', tipo: 'boolean' },
+            { key: 'fundamentoLegal', label: 'Fundamento legal indicado', tipo: 'text' },
             { key: 'resultadoIncidente', label: 'Resultado del incidente', tipo: 'text' },
             { key: 'explicacion', label: 'Explicación', tipo: 'textarea' },
           ]}
         />
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="deportacionesRemociones"
           titulo="G. Deportación, remoción o salida"
           items={respuestas.deportacionesRemociones || []}
           onChange={(v) => setArray('deportacionesRemociones', v)}
           etiquetaAgregar="Agregar otro registro"
-          disabled={!puedeEditar}
           campos={[
             {
               key: 'tipo', label: 'Tipo', tipo: 'select', opciones: [
-                { value: 'deportado', label: 'Deportado' }, { value: 'remocion', label: 'Remoción' },
-                { value: 'expedited_removal', label: 'Expedited removal' },
-                { value: 'voluntary_departure', label: 'Voluntary departure' },
-                { value: 'regresado_rechazado_frontera', label: 'Regresado/rechazado en frontera' },
-                { value: 'compareció_juez', label: 'Compareció ante juez' },
-                { value: 'immigration_court', label: 'Immigration Court' },
+                { value: 'expedited_removal', label: 'Expedited Removal' }, { value: 'removal_order', label: 'Removal Order' },
+                { value: 'voluntary_departure', label: 'Voluntary Departure' }, { value: 'stipulated_removal', label: 'Stipulated Removal' },
+                { value: 'withdrawal', label: 'Withdrawal of Application for Admission' },
+                { value: 'deportacion', label: 'Deportación' }, { value: 'otro', label: 'Otro' },
               ]
             },
             { key: 'fecha', label: 'Fecha', tipo: 'date' },
             { key: 'lugar', label: 'Lugar', tipo: 'text' },
             { key: 'autoridad', label: 'Autoridad', tipo: 'text' },
-            { key: 'numeroA', label: 'Número A', tipo: 'text' },
+            { key: 'numeroA', label: 'A-Number', tipo: 'text' },
+            { key: 'numeroCaso', label: 'Número de caso', tipo: 'text' },
+            { key: 'fundamentoLegal', label: 'Fundamento legal', tipo: 'text' },
             { key: 'resultado', label: 'Resultado', tipo: 'textarea' },
-            { key: 'fechaSalida', label: 'Fecha de salida', tipo: 'date' },
+            { key: 'fechaSalida', label: 'Fecha efectiva de salida', tipo: 'date' },
             { key: 'explicacion', label: 'Explicación', tipo: 'textarea' },
           ]}
         />
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="fraudeRepresentacion"
           titulo="H. Fraude o falsa representación"
           items={respuestas.fraudeRepresentacion || []}
           onChange={(v) => setArray('fraudeRepresentacion', v)}
           etiquetaAgregar="Agregar otro registro"
-          disabled={!puedeEditar}
           campos={[
             { key: 'fecha', label: 'Fecha', tipo: 'date' },
             { key: 'autoridad', label: 'Autoridad', tipo: 'text' },
+            { key: 'lugar', label: 'Lugar', tipo: 'text' },
             { key: 'situacion', label: 'Situación', tipo: 'textarea' },
             { key: 'documentoInvolucrado', label: 'Documento involucrado', tipo: 'text' },
             { key: 'resolucion', label: 'Resolución', tipo: 'textarea' },
-            { key: 'seMencionoSeccion', label: '¿Se mencionó 212(a)(6)(C)(i)?', tipo: 'boolean' },
+            { key: 'fundamentoLegal', label: 'Fundamento legal', tipo: 'text' },
+            { key: 'seMencionoSeccion', label: '¿Se mencionó INA 212(a)(6)(C)(i)?', tipo: 'boolean' },
+            { key: 'seMencionoOtraCausal', label: '¿Se mencionó alguna otra causal?', tipo: 'boolean' },
+            { key: 'especificarCausal', label: 'Especificar causal', tipo: 'text' },
+            { key: 'existeDeterminacionEscrita', label: '¿Existe determinación escrita?', tipo: 'boolean' },
             { key: 'explicacion', label: 'Explicación', tipo: 'textarea' },
+            { key: 'observacionesProfesionales', label: 'Observaciones profesionales', tipo: 'textarea' },
           ]}
         />
+        <p className="text-xs text-ink/40 -mt-4">
+          El sistema no determina automáticamente que exista fraude o inadmisibilidad — solo muestra alertas cuando
+          los datos capturados indican que el asunto requiere revisión profesional.
+        </p>
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="antecedentesPenales"
           titulo="I. Arrestos y antecedentes"
           items={respuestas.antecedentesPenales || []}
           onChange={(v) => setArray('antecedentesPenales', v)}
           etiquetaAgregar="Agregar otro registro"
-          disabled={!puedeEditar}
           campos={[
             { key: 'pais', label: 'País', tipo: 'text' },
             { key: 'estadoProvincia', label: 'Estado/provincia', tipo: 'text' },
+            { key: 'ciudadCondado', label: 'Ciudad/condado', tipo: 'text' },
             { key: 'fecha', label: 'Fecha', tipo: 'date' },
+            { key: 'agenciaArresto', label: 'Agencia que realizó el arresto', tipo: 'text' },
+            { key: 'tribunal', label: 'Tribunal', tipo: 'text' },
+            { key: 'numeroCaso', label: 'Número de caso / cause number', tipo: 'text' },
             { key: 'delitoCargo', label: 'Delito/cargo', tipo: 'text' },
             { key: 'fueArrestado', label: '¿Arrestado?', tipo: 'boolean' },
             { key: 'fueAcusado', label: '¿Acusado?', tipo: 'boolean' },
             { key: 'fueCondenado', label: '¿Condenado?', tipo: 'boolean' },
+            { key: 'disposicionFinal', label: 'Disposición final del caso', tipo: 'text' },
+            { key: 'fechaDisposicion', label: 'Fecha de disposición', tipo: 'date' },
             { key: 'sentencia', label: 'Sentencia', tipo: 'textarea' },
             { key: 'casoConcluido', label: '¿Caso concluido?', tipo: 'boolean' },
             { key: 'explicacion', label: 'Explicación', tipo: 'textarea' },
@@ -563,89 +771,190 @@ export default function HistorialMigratorioPage({ nombreUsuario, permisosUsuario
         />
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="peticionesAnteriores"
           titulo="J. Peticiones migratorias anteriores"
           items={respuestas.peticionesAnteriores || []}
           onChange={(v) => setArray('peticionesAnteriores', v)}
           etiquetaAgregar="Agregar otra petición"
-          disabled={!puedeEditar}
           campos={[
             {
-              key: 'tipo', label: 'Tipo', tipo: 'select', opciones: [
+              key: 'tipo', label: 'Tipo de petición/formulario', tipo: 'select', opciones: [
                 { value: 'i130', label: 'I-130' }, { value: 'i140', label: 'I-140' },
                 { value: 'i129f', label: 'I-129F' }, { value: 'i485', label: 'I-485' }, { value: 'otro', label: 'Otro' },
               ]
             },
             { key: 'peticionario', label: 'Peticionario', tipo: 'text' },
+            { key: 'beneficiario', label: 'Beneficiario', tipo: 'text' },
             { key: 'relacion', label: 'Relación', tipo: 'text' },
-            { key: 'fecha', label: 'Fecha', tipo: 'date' },
+            { key: 'categoriaClasificacion', label: 'Categoría/clasificación migratoria', tipo: 'text' },
             { key: 'receiptNumber', label: 'Receipt Number', tipo: 'text' },
+            { key: 'agenciaCentroServicio', label: 'Agencia/Centro de Servicio', tipo: 'text' },
+            { key: 'fecha', label: 'Fecha de presentación', tipo: 'date' },
+            { key: 'fechaDecision', label: 'Fecha de decisión', tipo: 'date' },
             {
               key: 'resultado', label: 'Resultado', tipo: 'select', opciones: [
                 { value: 'pendiente', label: 'Pendiente' }, { value: 'aprobada', label: 'Aprobada' },
                 { value: 'negada', label: 'Negada' }, { value: 'retirada', label: 'Retirada' },
-                { value: 'desconocido', label: 'Desconocido' },
+                { value: 'revocada', label: 'Revocada' }, { value: 'abandonada', label: 'Abandonada' }, { value: 'otro', label: 'Otro' },
               ]
             },
           ]}
         />
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="waiversPerdones"
           titulo="Waivers / perdones presentados"
           items={respuestas.waiversPerdones || []}
           onChange={(v) => setArray('waiversPerdones', v)}
           etiquetaAgregar="Agregar otro waiver"
-          disabled={!puedeEditar}
           campos={[
             {
-              key: 'tipo', label: 'Tipo', tipo: 'select', opciones: [
+              key: 'tipo', label: 'Tipo de waiver', tipo: 'select', opciones: [
                 { value: 'i601', label: 'I-601' }, { value: 'i601a', label: 'I-601A' },
-                { value: 'i212', label: 'I-212' }, { value: '212d3', label: '212(d)(3)' }, { value: 'otro', label: 'Otro' },
+                { value: 'i212', label: 'I-212' }, { value: '212d3', label: 'INA 212(d)(3)' }, { value: 'otro', label: 'Otro' },
               ]
             },
-            { key: 'fecha', label: 'Fecha', tipo: 'date' },
-            { key: 'resultado', label: 'Resultado', tipo: 'text' },
+            { key: 'fechaPresentacion', label: 'Fecha de presentación', tipo: 'date' },
+            { key: 'receiptNumber', label: 'Receipt Number', tipo: 'text' },
+            { key: 'agenciaConsulado', label: 'Agencia/consulado', tipo: 'text' },
+            { key: 'causalRelacionada', label: 'Causal o fundamento de inadmisibilidad relacionado', tipo: 'text' },
+            { key: 'fechaDecision', label: 'Fecha de decisión', tipo: 'date' },
+            {
+              key: 'resultado', label: 'Resultado', tipo: 'select', opciones: [
+                { value: 'pendiente', label: 'Pendiente' }, { value: 'aprobado', label: 'Aprobado' },
+                { value: 'negado', label: 'Negado' }, { value: 'retirado', label: 'Retirado' }, { value: 'otro', label: 'Otro' },
+              ]
+            },
+            { key: 'observaciones', label: 'Observaciones', tipo: 'textarea' },
           ]}
         />
 
         <SeccionRepetible
+          {...seccionRepetibleProps}
+          entidadTipo="foiaExpedientes"
           titulo="K. FOIA y expedientes gubernamentales"
           items={respuestas.foiaExpedientes || []}
           onChange={(v) => setArray('foiaExpedientes', v)}
           etiquetaAgregar="Agregar otro expediente"
-          disabled={!puedeEditar}
           campos={[
             {
               key: 'dependencia', label: 'Dependencia', tipo: 'select', opciones: [
-                { value: 'cbp', label: 'CBP' }, { value: 'uscis', label: 'USCIS' }, { value: 'ice', label: 'ICE' },
-                { value: 'eoir', label: 'EOIR' }, { value: 'dos', label: 'DOS' }, { value: 'fbi', label: 'FBI' },
+                { value: 'uscis', label: 'USCIS' }, { value: 'cbp', label: 'CBP' }, { value: 'ice', label: 'ICE' },
+                { value: 'eoir', label: 'EOIR' }, { value: 'dos', label: 'Department of State' },
                 { value: 'obim', label: 'OBIM' }, { value: 'otra', label: 'Otra' },
               ]
             },
-            { key: 'fechaObtencion', label: 'Fecha de obtención', tipo: 'date' },
+            { key: 'fechaSolicitud', label: 'Fecha de solicitud', tipo: 'date' },
+            { key: 'numeroControl', label: 'Número de control/request number', tipo: 'text' },
+            {
+              key: 'estado', label: 'Estado', tipo: 'select', opciones: [
+                { value: 'preparando', label: 'Preparando' }, { value: 'presentado', label: 'Presentado' },
+                { value: 'recibido', label: 'Recibido por agencia' }, { value: 'en_proceso', label: 'En proceso' },
+                { value: 'respuesta_parcial', label: 'Respuesta parcial' }, { value: 'completado', label: 'Completado' },
+                { value: 'cerrado', label: 'Cerrado' },
+              ]
+            },
+            { key: 'fechaRespuesta', label: 'Fecha de respuesta', tipo: 'date' },
             { key: 'notas', label: 'Notas', tipo: 'textarea' },
           ]}
         />
 
         {puedeEditar && (
           <div className="flex gap-3 sticky bottom-4">
-            <button
-              type="submit"
-              disabled={guardando}
-              className="text-sm bg-navy text-white rounded-md px-4 py-2 hover:bg-navy-700 transition-colors disabled:opacity-60"
-            >
+            <button type="submit" disabled={guardando} className="text-sm bg-navy text-white rounded-md px-4 py-2 hover:bg-navy-700 transition-colors disabled:opacity-60">
               {guardando ? 'Guardando…' : 'Guardar avance'}
             </button>
-            <button
-              type="button"
-              onClick={(e) => guardar(e as any, true)}
-              disabled={guardando}
-              className="text-sm border border-line bg-white rounded-md px-4 py-2 hover:bg-navy-50 transition-colors disabled:opacity-60"
-            >
+            <button type="button" onClick={(e) => guardar(e as any, true)} disabled={guardando} className="text-sm border border-line bg-white rounded-md px-4 py-2 hover:bg-navy-50 transition-colors disabled:opacity-60">
               Marcar módulo como completo
             </button>
           </div>
         )}
       </form>
+
+      {/* 12. ANÁLISIS JURÍDICO INTERNO — solo visible con permiso profesional */}
+      {puedeVerAnalisisJuridico && (
+        <div className="mt-10 border-2 border-navy-100 rounded-lg overflow-hidden">
+          <div className="bg-navy text-white px-6 py-3">
+            <h3 className="font-display text-base">Análisis Jurídico Interno</h3>
+            <p className="text-xs text-navy-100">
+              No visible para el cliente. Solo lo pueden ver y editar usuarios con permiso de revisión profesional.
+            </p>
+          </div>
+          <form onSubmit={guardarAnalisis} className="bg-white p-6 space-y-4">
+            {mensajeAnalisis && <p className="text-sm text-navy bg-navy-50 border border-navy-100 rounded-md px-3 py-2">{mensajeAnalisis}</p>}
+
+            <div>
+              <label className="block text-xs text-ink/60 mb-1">Resumen de hechos relevantes</label>
+              {renderCampo({ key: 'resumenHechos', label: '', tipo: 'textarea' }, analisis.resumenHechos, (v) => setAnalisis((p) => ({ ...p, resumenHechos: v })))}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-ink/60 mb-1">Posibles causales de inadmisibilidad</label>
+                {renderCampo({ key: 'a', label: '', tipo: 'textarea' }, analisis.posiblesCausalesInadmisibilidad, (v) => setAnalisis((p) => ({ ...p, posiblesCausalesInadmisibilidad: v })))}
+              </div>
+              <div>
+                <label className="block text-xs text-ink/60 mb-1">Posibles violaciones de estatus</label>
+                {renderCampo({ key: 'b', label: '', tipo: 'textarea' }, analisis.posiblesViolacionesEstatus, (v) => setAnalisis((p) => ({ ...p, posiblesViolacionesEstatus: v })))}
+              </div>
+              <div>
+                <label className="block text-xs text-ink/60 mb-1">Posibles barras/castigos</label>
+                {renderCampo({ key: 'c', label: '', tipo: 'textarea' }, analisis.posiblesBarrasCastigos, (v) => setAnalisis((p) => ({ ...p, posiblesBarrasCastigos: v })))}
+              </div>
+              <div>
+                <label className="block text-xs text-ink/60 mb-1">Nivel de riesgo</label>
+                {renderCampo(
+                  { key: 'nivelRiesgo', label: '', tipo: 'select', opciones: [
+                    { value: 'bajo', label: 'Bajo' }, { value: 'medio', label: 'Medio' },
+                    { value: 'alto', label: 'Alto' }, { value: 'critico', label: 'Crítico' },
+                  ] },
+                  analisis.nivelRiesgo,
+                  (v) => setAnalisis((p) => ({ ...p, nivelRiesgo: v }))
+                )}
+              </div>
+              <div>
+                <label className="block text-xs text-ink/60 mb-1">¿Posible necesidad de waiver/perdón?</label>
+                {renderCampo({ key: 'd', label: '', tipo: 'boolean' }, analisis.posibleNecesidadWaiver, (v) => setAnalisis((p) => ({ ...p, posibleNecesidadWaiver: v })))}
+              </div>
+              {analisis.posibleNecesidadWaiver && (
+                <div>
+                  <label className="block text-xs text-ink/60 mb-1">Tipo de waiver potencial</label>
+                  {renderCampo({ key: 'e', label: '', tipo: 'text' }, analisis.tipoWaiverPotencial, (v) => setAnalisis((p) => ({ ...p, tipoWaiverPotencial: v })))}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-ink/60 mb-1">¿FOIA recomendado?</label>
+                {renderCampo({ key: 'f', label: '', tipo: 'boolean' }, analisis.foiaRecomendado, (v) => setAnalisis((p) => ({ ...p, foiaRecomendado: v })))}
+              </div>
+              <div>
+                <label className="block text-xs text-ink/60 mb-1">Dependencias a consultar</label>
+                {renderCampo({ key: 'g', label: '', tipo: 'text' }, analisis.dependenciasAConsultar, (v) => setAnalisis((p) => ({ ...p, dependenciasAConsultar: v })))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-ink/60 mb-1">Documentos faltantes</label>
+              {renderCampo({ key: 'h', label: '', tipo: 'textarea' }, analisis.documentosFaltantes, (v) => setAnalisis((p) => ({ ...p, documentosFaltantes: v })))}
+            </div>
+            <div>
+              <label className="block text-xs text-ink/60 mb-1">Información pendiente de confirmar</label>
+              {renderCampo({ key: 'i', label: '', tipo: 'textarea' }, analisis.informacionPendienteConfirmar, (v) => setAnalisis((p) => ({ ...p, informacionPendienteConfirmar: v })))}
+            </div>
+            <div>
+              <label className="block text-xs text-ink/60 mb-1">Estrategia preliminar</label>
+              {renderCampo({ key: 'j', label: '', tipo: 'textarea' }, analisis.estrategiaPreliminar, (v) => setAnalisis((p) => ({ ...p, estrategiaPreliminar: v })))}
+            </div>
+            <div>
+              <label className="block text-xs text-ink/60 mb-1">Observaciones del profesional</label>
+              {renderCampo({ key: 'k', label: '', tipo: 'textarea' }, analisis.observacionesProfesional, (v) => setAnalisis((p) => ({ ...p, observacionesProfesional: v })))}
+            </div>
+
+            <button type="submit" disabled={guardandoAnalisis} className="text-sm bg-navy text-white rounded-md px-4 py-2 hover:bg-navy-700 transition-colors disabled:opacity-60">
+              {guardandoAnalisis ? 'Guardando…' : 'Guardar análisis'}
+            </button>
+          </form>
+        </div>
+      )}
     </PanelLayout>
   );
 }
@@ -683,6 +992,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       expediente,
       clienteNombre,
       puedeEditar: session.user.permisos.includes('modificar_expediente'),
+      puedeVerAnalisisJuridico: session.user.permisos.includes('revisar_expediente'),
     },
   };
 };
