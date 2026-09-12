@@ -116,14 +116,14 @@ function DocumentosDeRegistro({
     }
 
     setSubiendo(true);
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve((reader.result as string).split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(archivo);
-    });
-
     try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+        reader.readAsDataURL(archivo);
+      });
+
       const res = await fetch(`/api/expedientes/${expedienteId}/documentos-migratorios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,6 +137,9 @@ function DocumentosDeRegistro({
       });
       if (res.ok) onSubido();
       else alert('No se pudo subir el documento.');
+    } catch (err) {
+      console.error('Error al adjuntar documento:', err);
+      alert('No se pudo subir el documento.');
     } finally {
       setSubiendo(false);
       if (inputRef.current) inputRef.current.value = '';
