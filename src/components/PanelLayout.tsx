@@ -16,6 +16,7 @@ const NAV_LINKS = [
   { href: '/panel/usuarios', label: 'Usuarios', permiso: 'administrar_usuarios' },
   { href: '/panel/roles', label: 'Roles y permisos', permiso: 'administrar_configuracion' },
   { href: '/panel/plantillas-tramite', label: 'Plantillas de trámite', permiso: 'administrar_configuracion' },
+  { href: '/panel/plantillas-cuestionario', label: 'Plantillas de cuestionario', permiso: 'administrar_configuracion' },
   { href: '/panel/bitacora', label: 'Bitácora', permiso: 'administrar_usuarios' },
   { href: '/panel/perfil', label: 'Mi perfil', permiso: null },
 ];

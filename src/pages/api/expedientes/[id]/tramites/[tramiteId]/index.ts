@@ -42,13 +42,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // recalcularlas desde aquí (eso ya lo hace su propio módulo).
     const alertasModulo4 = await query<{ regla_codigo: string; descripcion: string; severidad: string }>(
       `SELECT regla_codigo, descripcion, severidad FROM alertas
-       WHERE expediente_id = $1 AND resuelta = FALSE AND regla_codigo LIKE 'm4\\_%' ESCAPE '\\'
+       WHERE expediente_id = $1 AND resuelta = FALSE AND (regla_codigo LIKE 'm4\\_%' ESCAPE '\\' OR regla_codigo LIKE 'm6\\_%' ESCAPE '\\')
        ORDER BY creado_en DESC`,
       [expedienteId]
     );
 
     const documentosDisponibles = await listarDocumentosExpediente(expedienteId);
     const reclasificaciones = await listarReclasificaciones(tramiteId);
+
+    // Resumen del Cuestionario/Intake (punto 13) — solo lectura, no lo
+    // crea: si el usuario nunca lo ha abierto, simplemente no existe
+    // todavía y se muestra "No iniciado".
+    const cuestionarioRows = await query<{ id: string; estado: string; avance?: never }>(
+      `SELECT id, estado FROM cuestionarios WHERE tramite_id = $1`,
+      [tramiteId]
+    );
+    const cuestionarioResumen = cuestionarioRows[0] ? { estado: cuestionarioRows[0].estado } : { estado: 'no_iniciado' as const };
 
     return res.status(200).json({
       tramite,
@@ -58,6 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       alertasModulo4,
       documentosDisponibles,
       reclasificaciones,
+      cuestionarioResumen,
     });
   } catch (err: any) {
     console.error('Error obteniendo trámite:', err.message);

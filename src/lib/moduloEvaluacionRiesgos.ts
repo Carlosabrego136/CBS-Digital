@@ -627,7 +627,7 @@ export async function obtenerModulo4(expedienteId: string) {
     resuelta: boolean;
   }>(
     `SELECT regla_codigo, descripcion, severidad, resuelta FROM alertas
-     WHERE expediente_id = $1 AND regla_codigo LIKE 'm4\\_%' ESCAPE '\\'
+     WHERE expediente_id = $1 AND (regla_codigo LIKE 'm4\\_%' ESCAPE '\\' OR regla_codigo LIKE 'm6\\_%' ESCAPE '\\')
      ORDER BY creado_en DESC`,
     [expedienteId]
   );

@@ -17,6 +17,7 @@ import type {
   EstadoRequisito,
 } from '@/lib/moduloTramites';
 import { ESTADOS_TRAMITE, type EstadoTramite } from '@/lib/moduloTramitesConstantes';
+import { ESTADO_CUESTIONARIO_LABEL } from '@/lib/moduloCuestionarioConstantes';
 import type { MatrizRiesgos } from '@/lib/moduloEvaluacionRiesgos';
 
 interface Props {
@@ -117,6 +118,13 @@ const ESTADO_REQUISITO_LABEL: Record<EstadoRequisito, string> = {
   no_aplica: 'No aplica',
 };
 
+const ESTADO_CUESTIONARIO_ESTILO: Record<string, string> = {
+  no_iniciado: 'bg-gray-100 text-gray-700 border-gray-300',
+  en_proceso: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  completo: 'bg-green-100 text-green-800 border-green-300',
+  requiere_revision: 'bg-red-100 text-red-800 border-red-300',
+};
+
 export default function TramiteDetallePage({
   nombreUsuario,
   permisosUsuario,
@@ -136,6 +144,7 @@ export default function TramiteDetallePage({
   const [notas, setNotas] = useState<{ contenido: string | null; nombreUsuario?: string; creadoEn?: string; actualizadoEn?: string }>({
     contenido: '',
   });
+  const [cuestionarioResumen, setCuestionarioResumen] = useState<{ estado: string }>({ estado: 'no_iniciado' });
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string; apellidos: string | null }[]>([]);
   const [tiposCatalogo, setTiposCatalogo] = useState<{ codigo: string; nombre: string }[]>([]);
 
@@ -159,6 +168,7 @@ export default function TramiteDetallePage({
         setDocumentosDisponibles(data.documentosDisponibles || []);
         setReclasificaciones(data.reclasificaciones || []);
         if (data.notasProfesionales) setNotas(data.notasProfesionales);
+        if (data.cuestionarioResumen) setCuestionarioResumen(data.cuestionarioResumen);
         setError(null);
       })
       .catch(() => setError('No se pudo cargar el trámite.'))
@@ -377,6 +387,20 @@ export default function TramiteDetallePage({
       </div>
 
       {/* Campos específicos según categoría (punto 8) */}
+      {/* Cuestionario / Intake (punto 13 del Módulo 6) */}
+      <a
+        href={`/panel/expedientes/${expedienteId}/tramites/${tramiteId}/cuestionario`}
+        className="bg-white border border-line rounded-lg p-6 mb-6 flex items-center justify-between hover:border-gold-400 transition-colors"
+      >
+        <div>
+          <h3 className="font-display text-base text-navy mb-1">Cuestionario / Intake</h3>
+          <p className="text-xs text-ink/50">Módulo 6 — captura estructurada de información para este trámite</p>
+        </div>
+        <span className={`text-xs border rounded-md px-3 py-1.5 ${ESTADO_CUESTIONARIO_ESTILO[cuestionarioResumen.estado] || ''}`}>
+          {ESTADO_CUESTIONARIO_LABEL[cuestionarioResumen.estado as keyof typeof ESTADO_CUESTIONARIO_LABEL] || cuestionarioResumen.estado}
+        </span>
+      </a>
+
       <CamposEspecificos tramite={tramite} camposSchema={camposSchema} puedeEditar={puedeEditar} onGuardado={cargar} accionar={accionar} />
 
       {/* Fechas importantes (punto 15) */}
