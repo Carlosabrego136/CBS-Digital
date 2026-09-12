@@ -32,6 +32,11 @@ ON CONFLICT (codigo) DO NOTHING;
 --    agregan/editan/activan/desactivan filas, nunca hace falta
 --    tocar código para agregar un tipo nuevo.
 -- ------------------------------------------------------------
+-- ------------------------------------------------------------
+-- 1) Catálogo de tipos de trámite (punto 1). Administrable: se
+--    agregan/editan/activan/desactivan filas, nunca hace falta
+--    tocar código para agregar un tipo nuevo.
+-- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS catalogo_tipos_tramite (
     codigo TEXT PRIMARY KEY,
     nombre TEXT NOT NULL,

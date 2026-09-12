@@ -21,39 +21,10 @@
 
 import { query } from './db';
 import { registrarCambios } from './historial';
+import { ESTADOS_TRAMITE, type EstadoTramite } from './moduloTramitesConstantes';
 
-export type EstadoTramite =
-  | 'consulta_inicial'
-  | 'en_evaluacion'
-  | 'pendiente_documentos'
-  | 'preparacion'
-  | 'listo_presentacion'
-  | 'presentado'
-  | 'pendiente_respuesta'
-  | 'rfe'
-  | 'entrevista_programada'
-  | 'aprobado'
-  | 'negado'
-  | 'cerrado'
-  | 'suspendido'
-  | 'retirado';
-
-export const ESTADOS_TRAMITE: { value: EstadoTramite; label: string }[] = [
-  { value: 'consulta_inicial', label: 'Consulta inicial' },
-  { value: 'en_evaluacion', label: 'En evaluación' },
-  { value: 'pendiente_documentos', label: 'Pendiente de documentos' },
-  { value: 'preparacion', label: 'Preparación' },
-  { value: 'listo_presentacion', label: 'Listo para presentación' },
-  { value: 'presentado', label: 'Presentado' },
-  { value: 'pendiente_respuesta', label: 'Pendiente de respuesta' },
-  { value: 'rfe', label: 'RFE / solicitud de evidencia' },
-  { value: 'entrevista_programada', label: 'Entrevista programada' },
-  { value: 'aprobado', label: 'Aprobado' },
-  { value: 'negado', label: 'Negado' },
-  { value: 'cerrado', label: 'Cerrado' },
-  { value: 'suspendido', label: 'Suspendido' },
-  { value: 'retirado', label: 'Retirado' },
-];
+export { ESTADOS_TRAMITE };
+export type { EstadoTramite };
 
 export type EstadoRequisito = 'pendiente' | 'en_proceso' | 'completo' | 'no_aplica';
 export type PersonaResponsableRequisito = 'solicitante' | 'peticionario' | 'beneficiario' | 'patrocinador' | 'otro';

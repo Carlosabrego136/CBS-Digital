@@ -14,10 +14,9 @@ import { query } from '@/lib/db';
 import PanelLayout from '@/components/PanelLayout';
 import type {
   TramiteDetalle,
-  EstadoTramite,
   EstadoRequisito,
 } from '@/lib/moduloTramites';
-import { ESTADOS_TRAMITE } from '@/lib/moduloTramites';
+import { ESTADOS_TRAMITE, type EstadoTramite } from '@/lib/moduloTramitesConstantes';
 import type { MatrizRiesgos } from '@/lib/moduloEvaluacionRiesgos';
 
 interface Props {
