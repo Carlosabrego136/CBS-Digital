@@ -175,10 +175,24 @@ function DocumentosDeRegistro({
         </ul>
       )}
       {!disabled && (
-        <label className="inline-block text-xs border border-line rounded-md px-2.5 py-1 cursor-pointer hover:bg-navy-50">
-          {subiendo ? 'Subiendo…' : '+ Adjuntar documento'}
-          <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={manejarArchivo} disabled={subiendo} />
-        </label>
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={subiendo}
+            className="text-xs border border-line rounded-md px-2.5 py-1 cursor-pointer hover:bg-navy-50 disabled:opacity-60"
+          >
+            {subiendo ? 'Subiendo…' : '+ Adjuntar documento'}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}
+            onChange={manejarArchivo}
+            disabled={subiendo}
+          />
+        </>
       )}
     </div>
   );
