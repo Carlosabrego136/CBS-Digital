@@ -679,8 +679,8 @@ export async function guardarNotasProfesionales(tramiteId: string, contenido: st
 // requisito sin volver a subirlos (punto 6).
 // ============================================================
 export async function listarDocumentosExpediente(expedienteId: string) {
-  return query<{ id: string; nombre_archivo: string; entidad_tipo: string; subido_en: string }>(
-    `SELECT id, nombre_archivo, entidad_tipo, subido_en FROM documentos_migratorios
+  return query<{ id: string; nombre_archivo: string; entidad_tipo: string; subido_en: string; url_archivo: string }>(
+    `SELECT id, nombre_archivo, entidad_tipo, subido_en, url_archivo FROM documentos_migratorios
      WHERE expediente_id = $1 AND vigente = TRUE ORDER BY subido_en DESC`,
     [expedienteId]
   );

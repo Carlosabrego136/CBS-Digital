@@ -354,6 +354,21 @@ function detectarInformacionFaltante(
     if (!tieneDocumento(n.id)) {
       items.push({ itemCodigo: `negativa_sin_documento:${n.id}`, descripcion: `Falta documento de la negativa de visa${n.fecha ? ' del ' + n.fecha : ''}.` });
     }
+    // Módulo 7, punto 5: una negativa capturada pero con campos clave
+    // sin llenar también cuenta como información pendiente, no solo la
+    // falta de documento.
+    const camposFaltantes: string[] = [];
+    if (!n.fecha) camposFaltantes.push('fecha');
+    if (!n.consulado) camposFaltantes.push('consulado');
+    if (!n.tipoVisaSolicitada) camposFaltantes.push('tipo de visa');
+    if (!n.seccionLegal) camposFaltantes.push('fundamento legal');
+    if (!n.explicacion) camposFaltantes.push('explicación');
+    if (camposFaltantes.length > 0) {
+      items.push({
+        itemCodigo: `negativa_datos_incompletos:${n.id}`,
+        descripcion: `Negativa de visa${n.fecha ? ' del ' + n.fecha : ''} con datos incompletos: falta ${camposFaltantes.join(', ')}.`,
+      });
+    }
   }
 
   for (const c of r.cancelacionesVisa ?? []) {

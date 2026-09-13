@@ -401,6 +401,17 @@ export default function TramiteDetallePage({
         </span>
       </a>
 
+      {/* Diagnóstico y Análisis Migratorio (Módulo 7) */}
+      <a
+        href={`/panel/expedientes/${expedienteId}/tramites/${tramiteId}/diagnostico`}
+        className="bg-white border border-line rounded-lg p-6 mb-6 flex items-center justify-between hover:border-gold-400 transition-colors"
+      >
+        <div>
+          <h3 className="font-display text-base text-navy mb-1">Diagnóstico y Análisis Migratorio</h3>
+          <p className="text-xs text-ink/50">Módulo 7 — mesa de análisis: hallazgos, relación con el trámite y diagnóstico profesional</p>
+        </div>
+      </a>
+
       <CamposEspecificos tramite={tramite} camposSchema={camposSchema} puedeEditar={puedeEditar} onGuardado={cargar} accionar={accionar} />
 
       {/* Fechas importantes (punto 15) */}
