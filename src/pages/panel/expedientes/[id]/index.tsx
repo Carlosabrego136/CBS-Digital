@@ -88,6 +88,8 @@ export default function ExpedienteResumen({ nombreUsuario, permisosUsuario, expe
         </div>
       </div>
 
+      <CitasResumen expedienteId={expediente.id} puedeEditar={permisosUsuario.includes('modificar_expediente')} />
+
       <TramitesResumen expedienteId={expediente.id} puedeEditar={permisosUsuario.includes('modificar_expediente')} />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -138,6 +140,69 @@ interface TramiteResumenItem {
 // Punto 18 — vista resumen de trámites desde la pantalla principal
 // del expediente. Se carga aparte (no en el SSR de la página) para
 // no volver más pesada la carga inicial de la ficha.
+interface CitaResumenItem {
+  id: string;
+  tipoCita: string;
+  tipoOtroEspecificar: string | null;
+  fecha: string | null;
+  hora: string | null;
+  estado: string;
+  responsableNombre: string | null;
+  tramiteNombre: string | null;
+}
+
+const ESTADO_CITA_COLOR: Record<string, string> = {
+  programada: 'bg-blue-100 text-blue-800',
+  confirmada: 'bg-green-100 text-green-800',
+  realizada: 'bg-gray-100 text-gray-700',
+  cancelada: 'bg-red-100 text-red-800',
+  reprogramada: 'bg-yellow-100 text-yellow-800',
+  no_asistio: 'bg-red-100 text-red-800',
+};
+
+// Punto 5 del Módulo 9 — sección "Citas" dentro del expediente, con
+// el botón "Programar cita".
+function CitasResumen({ expedienteId, puedeEditar }: { expedienteId: string; puedeEditar: boolean }) {
+  const [citas, setCitas] = useState<CitaResumenItem[] | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/expedientes/${expedienteId}/citas`)
+      .then((r) => r.json())
+      .then((data) => setCitas(data.citas || []))
+      .catch(() => setCitas([]));
+  }, [expedienteId]);
+
+  return (
+    <div className="bg-white border border-line rounded-lg p-6 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-display text-base text-navy">Citas (Módulo 9)</h3>
+        {puedeEditar && (
+          <a href={`/panel/expedientes/${expedienteId}/citas/nuevo`} className="text-xs border border-line rounded-md px-3 py-1.5 hover:bg-navy-50 transition-colors">
+            + Programar cita
+          </a>
+        )}
+      </div>
+      {citas === null && <p className="text-sm text-ink/40">Cargando…</p>}
+      {citas && citas.length === 0 && <p className="text-sm text-ink/40">Este expediente todavía no tiene citas registradas.</p>}
+      {citas && citas.length > 0 && (
+        <ul className="divide-y divide-line">
+          {citas.map((c) => (
+            <li key={c.id} className="py-3 first:pt-0 last:pb-0">
+              <a href={`/panel/expedientes/${expedienteId}/citas/${c.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm hover:text-navy">
+                <span className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${ESTADO_CITA_COLOR[c.estado] || ''}`}>{c.estado.replace(/_/g, ' ')}</span>
+                <span className="font-medium text-ink">{c.tipoCita === 'otro' ? c.tipoOtroEspecificar || 'Otro' : c.tipoCita.replace(/_/g, ' ')}</span>
+                {c.fecha && <span className="text-ink/60">{new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-MX')}{c.hora ? ` · ${c.hora.slice(0, 5)}` : ''}</span>}
+                {c.responsableNombre && <span className="text-ink/40">· {c.responsableNombre}</span>}
+                {c.tramiteNombre && <span className="text-ink/40">· {c.tramiteNombre}</span>}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function TramitesResumen({ expedienteId, puedeEditar }: { expedienteId: string; puedeEditar: boolean }) {
   const [tramites, setTramites] = useState<TramiteResumenItem[] | null>(null);
 
