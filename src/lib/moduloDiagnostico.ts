@@ -20,6 +20,7 @@ import { query } from './db';
 import { registrarCambios } from './historial';
 import type { RespuestasModulo3 } from './moduloHistorialMigratorio';
 import { calcularMatrizRiesgos, obtenerModulo4, type MatrizRiesgos, type SemaforoModulo4 } from './moduloEvaluacionRiesgos';
+import { listarHallazgosAceptadosParaTramite, listarHallazgosPendientesParaTramite, type HallazgoFoia } from './moduloFoia';
 
 export type RiesgoProfesional = 'bajo' | 'medio' | 'alto' | 'no_determinado';
 export type ViabilidadTramite = 'si' | 'no' | 'condicionado' | 'pendiente_informacion';
@@ -51,13 +52,14 @@ export interface FundamentoAnalisis {
 export interface Hallazgo {
   categoria: 'requiere_revision' | 'inconsistencia' | 'informacion_incompleta' | 'documentacion_faltante' | 'investigacion_sugerida';
   descripcion: string;
-  origen: 'modulo4' | 'modulo6' | 'modulo3';
+  origen: 'modulo4' | 'modulo6' | 'modulo3' | 'modulo8';
 }
 
 export interface DiagnosticoDetalle {
   semaforoAutomatico: SemaforoModulo4;
   matrizRiesgos: MatrizRiesgos;
   hallazgos: Hallazgo[];
+  hallazgosPendientesFoia: HallazgoFoia[];
   relacionAntecedentesTramite: string[];
   cuestionarioResumen: { estado: string; avance: number | null; existe: boolean };
   resumenAutomatico: string;
@@ -196,6 +198,16 @@ export async function obtenerDiagnostico(tramiteId: string): Promise<Diagnostico
     });
   }
 
+  // Punto 9 del Módulo 8: los hallazgos de FOIA que el profesional ya
+  // aceptó cuentan como parte del análisis; los que siguen "pendiente
+  // de revisión" se muestran aparte para que decida (aceptar/editar/
+  // descartar) — nunca se incorporan solos.
+  const hallazgosAceptadosFoia = await listarHallazgosAceptadosParaTramite(tramiteId);
+  for (const h of hallazgosAceptadosFoia) {
+    hallazgos.push({ categoria: 'requiere_revision', descripcion: h.descripcion, origen: 'modulo8' });
+  }
+  const hallazgosPendientesFoia = await listarHallazgosPendientesParaTramite(tramiteId);
+
   const relacionAntecedentesTramite = relacionarAntecedentesConTramite(modulo4.matrizRiesgos, respuestasM3);
 
   // El Módulo 4 solo genera una alerta de "negativas reiteradas" a
@@ -221,6 +233,7 @@ export async function obtenerDiagnostico(tramiteId: string): Promise<Diagnostico
     semaforoAutomatico: modulo4.semaforo,
     matrizRiesgos: modulo4.matrizRiesgos,
     hallazgos,
+    hallazgosPendientesFoia,
     relacionAntecedentesTramite,
     cuestionarioResumen,
     resumenAutomatico,

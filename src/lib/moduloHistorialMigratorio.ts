@@ -492,11 +492,12 @@ export async function registrarDocumentoMigratorio(params: {
   nombreArchivo: string;
   urlArchivo: string;
   usuarioId: string;
+  categoria?: string;
 }) {
   await query(
-    `INSERT INTO documentos_migratorios (expediente_id, entidad_tipo, entidad_id, nombre_archivo, url_archivo, subido_por)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [params.expedienteId, params.entidadTipo, params.entidadId, params.nombreArchivo, params.urlArchivo, params.usuarioId]
+    `INSERT INTO documentos_migratorios (expediente_id, entidad_tipo, entidad_id, nombre_archivo, url_archivo, subido_por, categoria)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [params.expedienteId, params.entidadTipo, params.entidadId, params.nombreArchivo, params.urlArchivo, params.usuarioId, params.categoria || null]
   );
 
   await query(

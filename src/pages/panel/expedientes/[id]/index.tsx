@@ -90,7 +90,7 @@ export default function ExpedienteResumen({ nombreUsuario, permisosUsuario, expe
 
       <TramitesResumen expedienteId={expediente.id} puedeEditar={permisosUsuario.includes('modificar_expediente')} />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <a
           href={`/panel/expedientes/${expediente.id}/historial-migratorio`}
           className="bg-white border border-line rounded-lg p-6 hover:border-gold-400 transition-colors block"
@@ -104,6 +104,13 @@ export default function ExpedienteResumen({ nombreUsuario, permisosUsuario, expe
         >
           <h3 className="font-display text-base text-navy mb-1">Evaluación de Elegibilidad y Riesgos</h3>
           <p className="text-xs text-ink/50">Módulo 4 — matriz de riesgos, causales de inadmisibilidad y evaluación profesional</p>
+        </a>
+        <a
+          href={`/panel/expedientes/${expediente.id}/foia`}
+          className="bg-white border border-line rounded-lg p-6 hover:border-gold-400 transition-colors block"
+        >
+          <h3 className="font-display text-base text-navy mb-1">FOIA, Antecedentes y Solicitudes Complementarias</h3>
+          <p className="text-xs text-ink/50">Módulo 8 — solicitudes de antecedentes gubernamentales y su seguimiento</p>
         </a>
       </div>
     </PanelLayout>

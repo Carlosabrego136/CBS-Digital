@@ -67,6 +67,9 @@ export default function DiagnosticoPage({ nombreUsuario, permisosUsuario, expedi
   const [semaforoAutomatico, setSemaforoAutomatico] = useState<SemaforoModulo4>('gris');
   const [matriz, setMatriz] = useState<MatrizRiesgos | null>(null);
   const [hallazgos, setHallazgos] = useState<Hallazgo[]>([]);
+  const [hallazgosPendientesFoia, setHallazgosPendientesFoia] = useState<
+    { id: string; descripcion: string; agenciaFuente: string | null; fecha: string | null }[]
+  >([]);
   const [relacion, setRelacion] = useState<string[]>([]);
   const [cuestionarioResumen, setCuestionarioResumen] = useState<{ estado: string; avance: number | null; existe: boolean }>({
     estado: 'no_iniciado',
@@ -92,6 +95,7 @@ export default function DiagnosticoPage({ nombreUsuario, permisosUsuario, expedi
         setSemaforoAutomatico(data.semaforoAutomatico || 'gris');
         setMatriz(data.matrizRiesgos || null);
         setHallazgos(data.hallazgos || []);
+        setHallazgosPendientesFoia(data.hallazgosPendientesFoia || []);
         setRelacion(data.relacionAntecedentesTramite || []);
         setCuestionarioResumen(data.cuestionarioResumen || { estado: 'no_iniciado', avance: null, existe: false });
         setResumenAutomatico(data.resumenAutomatico || '');
@@ -129,6 +133,15 @@ export default function DiagnosticoPage({ nombreUsuario, permisosUsuario, expedi
     } finally {
       setGuardando(false);
     }
+  }
+
+  async function decidirHallazgoFoia(hallazgoId: string, decision: 'aceptado' | 'descartado') {
+    await fetch(`/api/expedientes/${expedienteId}/tramites/${tramiteId}/diagnostico/hallazgo-foia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hallazgoId, decision }),
+    });
+    cargar();
   }
 
   async function agregarFundamento() {
@@ -233,6 +246,38 @@ export default function DiagnosticoPage({ nombreUsuario, permisosUsuario, expedi
           Ver cuestionario →
         </a>
       </div>
+
+      {/* Hallazgos de FOIA pendientes de revisión (Módulo 8, punto 9) */}
+      {puedeVerDiagnostico && hallazgosPendientesFoia.length > 0 && (
+        <div className="border border-navy-100 bg-navy-50/40 rounded-lg p-4 mb-6">
+          <p className="font-medium text-navy text-sm mb-2">Hallazgos de FOIA pendientes de revisión</p>
+          <ul className="space-y-3">
+            {hallazgosPendientesFoia.map((h) => (
+              <li key={h.id} className="text-sm border-b border-navy-100 pb-3 last:border-0 last:pb-0">
+                <p className="text-ink/80">{h.descripcion}</p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => decidirHallazgoFoia(h.id, 'aceptado')}
+                    className="text-xs border border-line rounded-md px-3 py-1 bg-white hover:bg-navy-50 transition-colors"
+                  >
+                    Aceptar
+                  </button>
+                  <button
+                    onClick={() => decidirHallazgoFoia(h.id, 'descartado')}
+                    className="text-xs border border-line rounded-md px-3 py-1 bg-white hover:bg-red-50 transition-colors"
+                  >
+                    Descartar
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-ink/40 mt-3">
+            Estos hallazgos vienen de FOIA, Antecedentes y Solicitudes Complementarias. Aceptarlos los incorpora al análisis; descartarlos los
+            elimina de esta lista sin afectar el diagnóstico.
+          </p>
+        </div>
+      )}
 
       {/* Diagnóstico Profesional (puntos 3, 4, 7, 8) */}
       {puedeVerDiagnostico ? (
@@ -433,9 +478,16 @@ export default function DiagnosticoPage({ nombreUsuario, permisosUsuario, expedi
           <ul className="space-y-1 text-sm">
             {documentos.map((d) => (
               <li key={d.id}>
-                <a href={d.url_archivo} target="_blank" rel="noopener noreferrer" className="text-navy hover:underline">
+                <button
+                  onClick={async () => {
+                    const res = await fetch(`/api/expedientes/${expedienteId}/documentos-migratorios?descargarId=${d.id}`);
+                    const data = await res.json();
+                    if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="text-navy hover:underline"
+                >
                   📎 {d.nombre_archivo}
-                </a>
+                </button>
               </li>
             ))}
           </ul>

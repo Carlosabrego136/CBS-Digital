@@ -44,12 +44,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const entidadId = req.query.entidadId as string | undefined;
     const filas = entidadId
       ? await query(
-          `SELECT id, entidad_tipo, entidad_id, nombre_archivo, url_archivo, subido_en
+          `SELECT id, entidad_tipo, entidad_id, nombre_archivo, url_archivo, subido_en, categoria
            FROM documentos_migratorios WHERE expediente_id = $1 AND entidad_id = $2 AND vigente = TRUE ORDER BY subido_en DESC`,
           [expedienteId, entidadId]
         )
       : await query(
-          `SELECT id, entidad_tipo, entidad_id, nombre_archivo, url_archivo, subido_en
+          `SELECT id, entidad_tipo, entidad_id, nombre_archivo, url_archivo, subido_en, categoria
            FROM documentos_migratorios WHERE expediente_id = $1 AND vigente = TRUE ORDER BY subido_en DESC`,
           [expedienteId]
         );
@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const session = await requerirPermiso(req, res, 'subir_documentos');
     if (!session) return;
 
-    const { entidadTipo, entidadId, nombreArchivo, archivoBase64, tipoMime } = req.body || {};
+    const { entidadTipo, entidadId, nombreArchivo, archivoBase64, tipoMime, categoria } = req.body || {};
     if (!entidadTipo || !entidadId || !archivoBase64 || !nombreArchivo) {
       return res.status(400).json({ error: 'Faltan datos del documento (entidadTipo, entidadId, nombreArchivo, archivoBase64)' });
     }
@@ -83,6 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         nombreArchivo,
         urlArchivo: key,
         usuarioId: session.user.id,
+        categoria: categoria || undefined,
       });
 
       return res.status(200).json({ ok: true });
