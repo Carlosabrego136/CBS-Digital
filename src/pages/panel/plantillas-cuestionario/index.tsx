@@ -6,7 +6,7 @@
 // vincula a un tipo de trámite y define condicionales — todo sin
 // tocar código.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -71,6 +71,14 @@ export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsua
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
+  const preguntasRef = useRef<HTMLDivElement>(null);
+
+  function abrirSeccion(id: string) {
+    setSeccionAbierta((actual) => (actual === id ? null : id));
+    // El clic te lleva directo a las preguntas de esa sección — ya
+    // no hay que bajar a buscarlas.
+    setTimeout(() => preguntasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
 
   const [nuevaSeccionLetra, setNuevaSeccionLetra] = useState('');
   const [nuevaSeccionNombre, setNuevaSeccionNombre] = useState('');
@@ -167,7 +175,7 @@ export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsua
               <ul className="divide-y divide-line mb-4">
                 {tipo.secciones.map((s) => (
                   <li key={s.id} className={`py-2 flex items-center justify-between text-sm ${!s.activo ? 'opacity-40' : ''}`}>
-                    <button onClick={() => setSeccionAbierta(seccionAbierta === s.id ? null : s.id)} className="text-left hover:text-navy flex-1">
+                    <button onClick={() => abrirSeccion(s.id)} className="text-left hover:text-navy flex-1">
                       {s.codigoLetra ? `${s.codigoLetra}. ` : ''}
                       {s.nombre} <span className="text-ink/40">({s.preguntas.length} preguntas)</span>
                     </button>
@@ -212,7 +220,7 @@ export default function PlantillasCuestionarioPage({ nombreUsuario, permisosUsua
 
           {/* Preguntas de la sección abierta */}
           {seccion && (
-            <div className="bg-white border border-line rounded-lg p-6 mb-6">
+            <div ref={preguntasRef} className="bg-white border border-line rounded-lg p-6 mb-6">
               <h3 className="font-display text-base text-navy mb-3">Preguntas de "{seccion.nombre}"</h3>
               {seccion.preguntas.length === 0 ? (
                 <p className="text-sm text-ink/40 mb-3">Todavía no hay preguntas en esta sección.</p>

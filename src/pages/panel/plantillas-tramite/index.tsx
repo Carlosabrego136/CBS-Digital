@@ -5,7 +5,7 @@
 // selecciona un tipo de trámite y administra su catálogo, sus
 // requisitos y sus etapas.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -50,6 +50,14 @@ const PERSONAS = ['solicitante', 'peticionario', 'beneficiario', 'patrocinador',
 export default function PlantillasTramitePage({ nombreUsuario, permisosUsuario }: Props) {
   const [tipos, setTipos] = useState<TipoTramite[]>([]);
   const [seleccionado, setSeleccionado] = useState<string>('');
+  const detalleRef = useRef<HTMLDivElement>(null);
+
+  function seleccionarTipo(codigo: string) {
+    setSeleccionado(codigo);
+    // Ya no hay que bajar a buscar el detalle: el clic te lleva
+    // directo a la sección del tipo elegido.
+    setTimeout(() => detalleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
@@ -106,7 +114,7 @@ export default function PlantillasTramitePage({ nombreUsuario, permisosUsuario }
           {tipos.map((t) => (
             <button
               key={t.codigo}
-              onClick={() => setSeleccionado(t.codigo)}
+              onClick={() => seleccionarTipo(t.codigo)}
               className={`text-xs rounded-full px-3 py-1.5 border transition-colors ${
                 seleccionado === t.codigo ? 'bg-navy text-white border-navy' : 'bg-white text-ink/70 border-line hover:border-gold-400'
               } ${!t.activo ? 'opacity-40' : ''}`}
@@ -156,7 +164,7 @@ export default function PlantillasTramitePage({ nombreUsuario, permisosUsuario }
       {cargando && <p className="text-sm text-ink/50">Cargando…</p>}
 
       {tipo && (
-        <>
+        <div ref={detalleRef}>
           {/* Detalle / activar-desactivar el tipo */}
           <div className="bg-white border border-line rounded-lg p-6 mb-6 flex items-center justify-between">
             <div>
@@ -299,7 +307,7 @@ export default function PlantillasTramitePage({ nombreUsuario, permisosUsuario }
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </PanelLayout>
   );
