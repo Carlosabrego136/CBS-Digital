@@ -412,6 +412,19 @@ export default function TramiteDetallePage({
         </div>
       </a>
 
+      {/* DS-160 (Módulo 10) — solo aplica a trámites B1/B2 */}
+      {tramite.tipoTramiteCodigo === 'b1_b2' && (
+        <a
+          href={`/panel/expedientes/${expedienteId}/tramites/${tramiteId}/ds160`}
+          className="bg-white border border-line rounded-lg p-6 mb-6 flex items-center justify-between hover:border-gold-400 transition-colors"
+        >
+          <div>
+            <h3 className="font-display text-base text-navy mb-1">DS-160</h3>
+            <p className="text-xs text-ink/50">Módulo 10 — preparación, revisión y control de la solicitud de visa B1/B2</p>
+          </div>
+        </a>
+      )}
+
       <CamposEspecificos tramite={tramite} camposSchema={camposSchema} puedeEditar={puedeEditar} onGuardado={cargar} accionar={accionar} />
 
       {/* Fechas importantes (punto 15) */}
