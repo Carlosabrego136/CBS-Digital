@@ -493,10 +493,10 @@ export async function registrarDocumentoMigratorio(params: {
   urlArchivo: string;
   usuarioId: string;
   categoria?: string;
-}) {
-  await query(
+}): Promise<string> {
+  const rows = await query<{ id: string }>(
     `INSERT INTO documentos_migratorios (expediente_id, entidad_tipo, entidad_id, nombre_archivo, url_archivo, subido_por, categoria)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
     [params.expedienteId, params.entidadTipo, params.entidadId, params.nombreArchivo, params.urlArchivo, params.usuarioId, params.categoria || null]
   );
 
@@ -504,6 +504,8 @@ export async function registrarDocumentoMigratorio(params: {
     `INSERT INTO bitacora (usuario_id, expediente_id, accion, detalle) VALUES ($1, $2, 'documento_migratorio_cargado', $3)`,
     [params.usuarioId, params.expedienteId, JSON.stringify({ entidadTipo: params.entidadTipo, entidadId: params.entidadId, nombreArchivo: params.nombreArchivo })]
   );
+
+  return rows[0].id;
 }
 
 // ------------------------------------------------------------

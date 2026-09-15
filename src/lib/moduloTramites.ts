@@ -26,7 +26,16 @@ import { ESTADOS_TRAMITE, type EstadoTramite } from './moduloTramitesConstantes'
 export { ESTADOS_TRAMITE };
 export type { EstadoTramite };
 
-export type EstadoRequisito = 'pendiente' | 'en_proceso' | 'completo' | 'no_aplica';
+export type EstadoRequisito =
+  | 'pendiente'
+  | 'en_proceso'
+  | 'completo'
+  | 'no_aplica'
+  | 'solicitado_cliente'
+  | 'recibido'
+  | 'en_revision'
+  | 'aceptado'
+  | 'rechazado_sustituir';
 export type PersonaResponsableRequisito = 'solicitante' | 'peticionario' | 'beneficiario' | 'patrocinador' | 'otro';
 
 export interface TipoTramite {
@@ -245,7 +254,7 @@ export async function actualizarEtapaPlantilla(id: string, datos: { nombre?: str
 function calcularSemaforoDocumental(requisitos: RequisitoConEstado[]): SemaforoDocumental {
   const obligatorios = requisitos.filter((r) => r.obligatorio && r.estado !== 'no_aplica');
   if (obligatorios.length === 0) return 'verde';
-  const completos = obligatorios.filter((r) => r.estado === 'completo').length;
+  const completos = obligatorios.filter((r) => r.estado === 'completo' || r.estado === 'aceptado').length;
   if (completos === obligatorios.length) return 'verde';
   if (completos > 0) return 'amarillo';
   return 'rojo';
@@ -253,7 +262,7 @@ function calcularSemaforoDocumental(requisitos: RequisitoConEstado[]): SemaforoD
 
 function calcularAvanceAdministrativo(requisitos: RequisitoConEstado[], etapas: EtapaConEstado[]): number {
   const totalRequisitos = requisitos.filter((r) => r.estado !== 'no_aplica').length;
-  const completosRequisitos = requisitos.filter((r) => r.estado === 'completo').length;
+  const completosRequisitos = requisitos.filter((r) => r.estado === 'completo' || r.estado === 'aceptado').length;
   const totalEtapas = etapas.length;
   const indiceEtapaActual = etapas.findIndex((e) => e.esActual);
   const etapasCompletadas = indiceEtapaActual >= 0 ? indiceEtapaActual : etapas.filter((e) => e.completada).length;

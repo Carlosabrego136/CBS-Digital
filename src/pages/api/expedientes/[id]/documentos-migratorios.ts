@@ -7,7 +7,7 @@
 // Módulo 2 — mismo patrón de base64 + bodyParser con límite de 10mb.
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { requerirPermiso } from '@/lib/apiAuth';
+import { requerirPermiso, requerirAccesoExpediente } from '@/lib/apiAuth';
 import { query } from '@/lib/db';
 import { subirDocumento, obtenerUrlDescarga } from '@/lib/r2';
 import { registrarDocumentoMigratorio } from '@/lib/moduloHistorialMigratorio';
@@ -26,6 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const session = await requerirPermiso(req, res, 'ver_documentos');
     if (!session) return;
+    if (!(await requerirAccesoExpediente(req, res, session, expedienteId))) return;
 
     // Modo descarga: ?descargarId=<id del documento> devuelve una URL
     // firmada temporal (5 min), igual que el resto de los documentos
@@ -59,6 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     const session = await requerirPermiso(req, res, 'subir_documentos');
     if (!session) return;
+    if (!(await requerirAccesoExpediente(req, res, session, expedienteId))) return;
 
     const { entidadTipo, entidadId, nombreArchivo, archivoBase64, tipoMime, categoria } = req.body || {};
     if (!entidadTipo || !entidadId || !archivoBase64 || !nombreArchivo) {
@@ -76,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const key = `expedientes/${expedienteId}/historial-migratorio/${entidadTipo}/${entidadId}-${Date.now()}-${nombreArchivo}`;
       await subirDocumento(key, buffer, tipoMime || 'application/octet-stream');
 
-      await registrarDocumentoMigratorio({
+      const documentoId = await registrarDocumentoMigratorio({
         expedienteId,
         entidadTipo,
         entidadId,
@@ -86,7 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         categoria: categoria || undefined,
       });
 
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, id: documentoId });
     } catch (err: any) {
       console.error('Error subiendo documento migratorio:', err.message);
       return res.status(500).json({ error: 'No se pudo subir el documento' });
@@ -96,6 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'DELETE') {
     const session = await requerirPermiso(req, res, 'subir_documentos');
     if (!session) return;
+    if (!(await requerirAccesoExpediente(req, res, session, expedienteId))) return;
 
     const documentoId = req.query.documentoId as string;
     if (!documentoId) return res.status(400).json({ error: 'Falta documentoId' });

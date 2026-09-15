@@ -116,6 +116,11 @@ const ESTADO_REQUISITO_LABEL: Record<EstadoRequisito, string> = {
   en_proceso: 'En proceso',
   completo: 'Completo',
   no_aplica: 'No aplica',
+  solicitado_cliente: 'Solicitado al cliente',
+  recibido: 'Recibido',
+  en_revision: 'En revisión',
+  aceptado: 'Aceptado',
+  rechazado_sustituir: 'Rechazado / sustituir',
 };
 
 const ESTADO_CUESTIONARIO_ESTILO: Record<string, string> = {
@@ -424,6 +429,17 @@ export default function TramiteDetallePage({
           </div>
         </a>
       )}
+
+      {/* Documentos, Checklist y Control Documental (Módulo 11) */}
+      <a
+        href={`/panel/expedientes/${expedienteId}/tramites/${tramiteId}/documentos`}
+        className="bg-white border border-line rounded-lg p-6 mb-6 flex items-center justify-between hover:border-gold-400 transition-colors"
+      >
+        <div>
+          <h3 className="font-display text-base text-navy mb-1">Documentos, Checklist y Control Documental</h3>
+          <p className="text-xs text-ink/50">Módulo 11 — versiones, rechazos, traducciones y vencimientos</p>
+        </div>
+      </a>
 
       <CamposEspecificos tramite={tramite} camposSchema={camposSchema} puedeEditar={puedeEditar} onGuardado={cargar} accionar={accionar} />
 
